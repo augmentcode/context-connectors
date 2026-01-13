@@ -3,8 +3,15 @@
   "version": "0.1.0",
   "description": "Modular system for indexing any data source and making it searchable via Augment's context engine",
   "type": "module",
+  "files": [
+    "dist",
+    "!dist/**/*.test.js",
+    "!dist/**/*.test.js.map",
+    "!dist/**/*.test.d.ts",
+    "!dist/**/*.test.d.ts.map"
+  ],
   "bin": {
-    "context-connectors": "./dist/bin/index.js"
+    "context-connectors": "dist/bin/index.js"
   },
   "scripts": {
     "build": "tsc",
