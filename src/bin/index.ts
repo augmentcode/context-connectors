@@ -17,7 +17,7 @@ const packageJson = require("../../package.json");
 const program = new Command();
 
 program
-  .name("context-connectors")
+  .name("ctxc")
   .description("Index and search any data source with Augment's context engine")
   .version(packageJson.version);
 
