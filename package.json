@@ -11,7 +11,7 @@
     "!dist/**/*.test.d.ts.map"
   ],
   "bin": {
-    "context-connectors": "dist/bin/index.js"
+    "ctxc": "dist/bin/index.js"
   },
   "scripts": {
     "build": "tsc",
