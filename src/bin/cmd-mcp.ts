@@ -33,7 +33,9 @@ const stdioCommand = new Command("stdio")
         store = new FilesystemStore();
         indexNames = await store.list();
         if (indexNames.length === 0) {
-          console.error("No indexes found. Create an index first with 'context-connectors index'");
+          console.error("Error: No indexes found.");
+          console.error("The MCP server requires at least one index to operate.");
+          console.error("Run 'ctxc index --help' to see how to create an index.");
           process.exit(1);
         }
       }
@@ -82,6 +84,13 @@ const httpCommand = new Command("http")
       } else {
         // No --index: use default store, serve all
         store = new FilesystemStore();
+        const availableIndexes = await store.list();
+        if (availableIndexes.length === 0) {
+          console.error("Error: No indexes found.");
+          console.error("The MCP server requires at least one index to operate.");
+          console.error("Run 'ctxc index --help' to see how to create an index.");
+          process.exit(1);
+        }
         indexNames = undefined;
       }
 
