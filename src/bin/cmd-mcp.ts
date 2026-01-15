@@ -35,7 +35,7 @@ const stdioCommand = new Command("stdio")
         if (indexNames.length === 0) {
           console.error("Error: No indexes found.");
           console.error("The MCP server requires at least one index to operate.");
-          console.error("Create an index first: context-connectors index <path>");
+          console.error("Run 'ctxc index --help' to see how to create an index.");
           process.exit(1);
         }
       }
@@ -88,7 +88,7 @@ const httpCommand = new Command("http")
         if (availableIndexes.length === 0) {
           console.error("Error: No indexes found.");
           console.error("The MCP server requires at least one index to operate.");
-          console.error("Create an index first: context-connectors index <path>");
+          console.error("Run 'ctxc index --help' to see how to create an index.");
           process.exit(1);
         }
         indexNames = undefined;
