@@ -1,0 +1,24 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": ["ultracite/core"],
+  "linter": {
+    "rules": {
+      "style": {
+        "useBlockStatements": "off",
+        "useNodejsImportProtocol": "warn",
+        "noNonNullAssertion": "warn"
+      },
+      "suspicious": {
+        "useAwait": "warn",
+        "noExplicitAny": "warn"
+      },
+      "correctness": {
+        "noUnusedVariables": "warn"
+      },
+      "performance": {
+        "noBarrelFile": "warn"
+      }
+    }
+  }
+}
+

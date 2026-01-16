@@ -41,12 +41,14 @@ import {
   READ_FILE_DESCRIPTION,
   withIndexList,
 } from "./tool-descriptions.js";
+import { AugmentLanguageModel, resolveAugmentCredentials } from "@augmentcode/auggie-sdk";
 
 /**
  * Supported LLM providers.
  * Each requires its corresponding AI SDK provider package to be installed.
+ * The "augment" provider uses the Auggie SDK and requires @augmentcode/auggie-sdk.
  */
-export type Provider = "openai" | "anthropic" | "google";
+export type Provider = "openai" | "anthropic" | "google" | "augment";
 
 /**
  * Configuration for the CLI agent with a single SearchClient.
@@ -170,6 +172,14 @@ async function loadModel(
           `Google provider not installed. Run: npm install @ai-sdk/google`
         );
       }
+    }
+    case "augment": {
+      const credentials = await resolveAugmentCredentials();
+      // Cast to LanguageModel to handle version differences in @ai-sdk/provider types
+      return new AugmentLanguageModel(modelName, {
+        apiKey: credentials.apiKey,
+        apiUrl: credentials.apiUrl,
+      }) as unknown as LanguageModel;
     }
     default:
       throw new Error(`Unknown provider: ${provider}`);

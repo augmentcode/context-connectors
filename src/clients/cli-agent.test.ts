@@ -24,6 +24,15 @@ vi.mock("@ai-sdk/google", () => ({
   google: vi.fn(() => "mock-google-model"),
 }));
 
+// Mock the Augment SDK
+vi.mock("@augmentcode/auggie-sdk", () => ({
+  AugmentLanguageModel: vi.fn().mockImplementation(() => "mock-augment-model"),
+  resolveAugmentCredentials: vi.fn().mockResolvedValue({
+    apiKey: "test-api-key",
+    apiUrl: "https://test.augmentcode.com",
+  }),
+}));
+
 describe("CLIAgent", () => {
   let mockClient: any;
 
@@ -64,6 +73,15 @@ describe("CLIAgent", () => {
     expect(agent).toBeDefined();
   });
 
+  it("creates agent with augment provider", () => {
+    const agent = new CLIAgent({
+      client: mockClient,
+      provider: "augment",
+      model: "claude-sonnet-4",
+    });
+    expect(agent).toBeDefined();
+  });
+
   it("resets conversation history", () => {
     const agent = new CLIAgent({
       client: mockClient,
@@ -84,4 +102,3 @@ describe("CLIAgent", () => {
     expect(agent).toBeDefined();
   });
 });
-

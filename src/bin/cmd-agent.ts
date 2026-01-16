@@ -12,6 +12,7 @@ const PROVIDER_DEFAULTS: Record<Provider, string> = {
   openai: "gpt-5-mini",
   anthropic: "claude-haiku-4-5",
   google: "gemini-3-flash-preview",
+  augment: "claude-sonnet-4-5",
 };
 
 export const agentCommand = new Command("agent")
@@ -22,7 +23,7 @@ export const agentCommand = new Command("agent")
   )
   .requiredOption(
     "--provider <name>",
-    "LLM provider (openai, anthropic, google)"
+    "LLM provider (openai, anthropic, google, augment)"
   )
   .option("--search-only", "Disable listFiles/readFile tools (search only)")
   .option("--model <name>", "Model to use (defaults based on provider)")
@@ -34,9 +35,9 @@ export const agentCommand = new Command("agent")
     try {
       // Validate provider
       const provider = options.provider as Provider;
-      if (!["openai", "anthropic", "google"].includes(provider)) {
+      if (!["openai", "anthropic", "google", "augment"].includes(provider)) {
         console.error(
-          `Unknown provider: ${provider}. Use: openai, anthropic, or google`
+          `Unknown provider: ${provider}. Use: openai, anthropic, google, or augment`
         );
         process.exit(1);
       }
