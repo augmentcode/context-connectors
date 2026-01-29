@@ -4,7 +4,8 @@
 
 import { Readable } from "node:stream";
 import ignoreFactory, { type Ignore } from "ignore";
-import tar from "tar";
+import * as tar from "tar";
+import type { ReadEntry } from "tar";
 import { shouldFilterFile } from "../core/file-filter.js";
 import { isoTimestamp } from "../core/utils.js";
 import type { FileEntry, FileInfo, SourceMetadata } from "../core/types.js";
@@ -256,7 +257,7 @@ export class GitLabSource implements Source {
 
     await new Promise<void>((resolve, reject) => {
       const parser = tar.list({
-        onentry: (entry) => {
+        onReadEntry: (entry: ReadEntry) => {
           // Skip directories and symlinks
           if (entry.type !== "File") {
             return;
@@ -269,7 +270,7 @@ export class GitLabSource implements Source {
 
           // Read file contents
           const chunks: Buffer[] = [];
-          entry.on("data", (chunk) => chunks.push(chunk));
+          entry.on("data", (chunk: Buffer) => chunks.push(chunk));
           entry.on("end", () => {
             const contentBuffer = Buffer.concat(chunks);
 
