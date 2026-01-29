@@ -32,7 +32,7 @@
 import { Readable } from "node:stream";
 import ignoreFactory, { type Ignore } from "ignore";
 import * as tar from "tar";
-import type { ReadEntry } from "tar";
+import type { Parser, ReadEntry } from "tar";
 import { shouldFilterFile } from "../core/file-filter.js";
 import { isoTimestamp } from "../core/utils.js";
 import type { FileEntry, FileInfo, SourceMetadata } from "../core/types.js";
@@ -302,10 +302,14 @@ export class GitHubSource implements Source {
     const stream = Readable.from(buffer);
 
     await new Promise<void>((resolve, reject) => {
-      const parser = tar.list({
+      // Use tar.Parser instead of tar.list() because tar.list() in tar v7
+      // does not emit 'data' or 'end' events on entries - it only lists metadata.
+      // tar.Parser provides readable entries that emit data for file contents.
+      const parser: Parser = new tar.Parser({
         onReadEntry: (entry: ReadEntry) => {
           // Skip directories and symlinks
           if (entry.type !== "File") {
+            entry.resume(); // drain the entry to continue parsing
             return;
           }
 
@@ -336,9 +340,7 @@ export class GitHubSource implements Source {
 
       stream.pipe(parser);
       parser.on("close", resolve);
-      // Handle parser errors (tar library types don't include error event, but the underlying stream does)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (parser as any).on("error", reject);
+      parser.on("error", reject);
       stream.on("error", reject);
     });
 
