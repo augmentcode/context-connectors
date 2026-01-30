@@ -4,31 +4,20 @@
  * These tests verify that createSourceFromState correctly uses resolvedRef
  * from state metadata when creating source instances.
  *
- * The tests mock the source modules to capture what config gets passed
+ * We mock GitHub and Website sources to capture what config gets passed
  * to the constructors, without needing API credentials.
+ *
+ * Since all VCS sources (GitHub, GitLab, BitBucket) use the same getRef() logic,
+ * we only test GitHub as the representative case.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { IndexStateSearchOnly, SourceMetadata } from "../core/types.js";
 
-// Mock the source modules to capture constructor calls
+// Mock only the sources we actually test
 vi.mock("../sources/github.js", () => ({
   GitHubSource: vi.fn().mockImplementation((config) => ({
     type: "github" as const,
-    config,
-  })),
-}));
-
-vi.mock("../sources/gitlab.js", () => ({
-  GitLabSource: vi.fn().mockImplementation((config) => ({
-    type: "gitlab" as const,
-    config,
-  })),
-}));
-
-vi.mock("../sources/bitbucket.js", () => ({
-  BitBucketSource: vi.fn().mockImplementation((config) => ({
-    type: "bitbucket" as const,
     config,
   })),
 }));
