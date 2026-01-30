@@ -16,7 +16,7 @@
  *   npx tsx test/resolved-ref.test.ts
  */
 
-import { GitHubSource } from "../src/sources/github.js";
+import { GitHubSource } from "../dist/sources/github.js";
 
 // Skip if no GitHub token
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
