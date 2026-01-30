@@ -36,7 +36,7 @@ This directory contains integration tests that require real credentials and make
 |------|-------------|
 | `augment-provider.ts` | Tests the Augment provider SDK integration (credentials, model, API calls, tool calling) |
 | `cli-agent.ts` | Tests the built `ctxc` CLI binary end-to-end (indexes augmentcode/auggie, then runs agent) |
-| `resolved-ref.test.ts` | Tests that GitHubSource operations use the exact commit SHA provided as ref (honors resolvedRef) |
+| `resolved-ref.ts` | Tests that GitHubSource operations use the exact commit SHA provided as ref (honors resolvedRef) |
 
 ## Note
 
