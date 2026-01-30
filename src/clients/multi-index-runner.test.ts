@@ -74,8 +74,17 @@ vi.mock("../sources/website.js", () => ({
   })),
 }));
 
-// Import after mocking
-import { MultiIndexRunner } from "./multi-index-runner.js";
+// Try to import SDK-dependent modules
+let MultiIndexRunner: typeof import("./multi-index-runner.js").MultiIndexRunner;
+let sdkLoadError: Error | null = null;
+
+try {
+  const mod = await import("./multi-index-runner.js");
+  MultiIndexRunner = mod.MultiIndexRunner;
+} catch (e) {
+  sdkLoadError = e as Error;
+}
+
 import { GitHubSource } from "../sources/github.js";
 import { GitLabSource } from "../sources/gitlab.js";
 import { BitBucketSource } from "../sources/bitbucket.js";
@@ -97,7 +106,12 @@ const createMockStore = (stateMap: Map<string, IndexStateSearchOnly>): IndexStor
   list: vi.fn().mockResolvedValue(Array.from(stateMap.keys())),
 });
 
-describe("MultiIndexRunner", () => {
+// Check if API credentials are available for tests
+const hasApiCredentials = !!(
+  process.env.AUGMENT_API_TOKEN && process.env.AUGMENT_API_URL
+);
+
+describe.skipIf(sdkLoadError !== null || !hasApiCredentials)("MultiIndexRunner", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -220,4 +234,3 @@ describe("MultiIndexRunner", () => {
     });
   });
 });
-
