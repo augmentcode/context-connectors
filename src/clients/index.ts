@@ -4,6 +4,13 @@
 
 export { SearchClient, type SearchClientConfig } from "./search-client.js";
 export { CLIAgent, type CLIAgentConfig, type Provider } from "./cli-agent.js";
+// Re-export from auggie-sdk for convenience
+export {
+  AugmentLanguageModel,
+  resolveAugmentCredentials,
+  type AugmentLanguageModelConfig,
+  type AugmentCredentials,
+} from "@augmentcode/auggie-sdk";
 export {
   MultiIndexRunner,
   type MultiIndexRunnerConfig,
