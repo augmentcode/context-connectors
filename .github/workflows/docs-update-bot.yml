@@ -1,0 +1,90 @@
+name: Auggie Bot
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  documentation-generation:
+    runs-on: ubuntu-latest
+    # Only run if comment contains @update-docs
+    # Only allow trusted actors (org members, collaborators, or repo owner) to trigger
+    if: |
+      (
+        github.event.comment.author_association == 'OWNER' ||
+        github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'COLLABORATOR'
+      ) &&
+      contains(github.event.comment.body, '@update-docs')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout docs repository
+        uses: actions/checkout@v4
+        with:
+          repository: augmentcode/docs
+          path: docs
+          token: ${{ secrets.TULGA_GITHUB_PAT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure git for docs repository
+        working-directory: docs
+        run: |
+          git config user.email "auggie[bot]@users.noreply.github.com"
+          git config user.name "auggie[bot]"
+          git remote set-url origin https://x-access-token:${{ secrets.TULGA_GITHUB_PAT_TOKEN }}@github.com/augmentcode/docs.git
+
+      - name: Run Augment
+        uses: augmentcode/augment-action@main
+        with:
+          augment_api_key: ${{ secrets.AUGMENT_API_KEY }}
+          augment_api_url: ${{ vars.AUGMENT_API_URL }}
+          workspace_root: ${{ github.workspace }}
+          prompt: |
+            You are a documentation maintenance assistant. Your task is to ensure documentation stays synchronized with code changes.
+
+            ## Workspace Structure
+            Your workspace contains TWO repositories:
+            - **Source repository** (`augmentcode/context-connectors`): Located at the workspace root (`.`)
+              - Use this to READ code changes and understand what was modified
+            - **Documentation repository** (`augmentcode/docs`): Located at `./docs/`
+              - Use this to WRITE documentation updates
+              - All commits, branches, and PRs must be created here
+
+            ## Triggering PR
+            - PR #${{ github.event.issue.number }} in `augmentcode/context-connectors`
+
+            ## Instructions
+
+            1. **Analyze the PR**: Read the code changes from the source repository (workspace root) to understand what functionality was added, modified, or removed. You can also use the GitHub API to get PR details.
+
+            2. **Identify documentation impact**: Determine if the changes affect:
+               - API references or method signatures
+               - Configuration options
+               - Usage examples or tutorials
+               - Installation or setup instructions
+               - Breaking changes or deprecations
+
+            3. **Update documentation**: If changes are needed, update the relevant files in the `docs/` directory (the docs repository).
+
+            4. **Create a PR in the docs repository**:
+               - Change directory to `docs/` before running git commands
+               - Create a new branch: `git checkout -b docs/update-from-context-connectors-pr-${{ github.event.issue.number }}`
+               - Stage and commit your changes
+               - Push the branch: `git push -u origin docs/update-from-context-connectors-pr-${{ github.event.issue.number }}`
+               - Create a pull request in `augmentcode/docs` using the GitHub API
+               - Reference the source PR: "Documentation updates for augmentcode/context-connectors#${{ github.event.issue.number }}"
+               - Comment on the source PR with the docs PR link
+
+            5. **No changes needed**: If the PR contains internal refactoring, test-only changes, or other modifications that don't affect user-facing documentation, comment that no documentation updates are required and briefly explain why.
