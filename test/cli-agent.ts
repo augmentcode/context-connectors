@@ -14,6 +14,7 @@
 
 import { spawn } from "child_process";
 import { mkdtemp, rm } from "fs/promises";
+import { resolve } from "path";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -26,12 +27,15 @@ interface TestResult {
 
 let testIndexPath: string | null = null;
 
+// Path to the local CLI build
+const CLI_PATH = resolve(import.meta.dirname, "../dist/bin/index.js");
+
 async function runCLI(
   args: string[],
   timeoutMs = 60000
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   return new Promise((resolve) => {
-    const proc = spawn("npx", ["ctxc", ...args], {
+    const proc = spawn(process.execPath, [CLI_PATH, ...args], {
       cwd: process.cwd(),
       env: process.env,
       timeout: timeoutMs,
