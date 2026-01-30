@@ -171,7 +171,7 @@ describe("createSourceFromState", () => {
     it("throws error for unknown source type", async () => {
       const state = createMockState({
         type: "unknown" as any,
-        config: {},
+        config: {} as any,
         syncedAt: new Date().toISOString(),
       });
 
