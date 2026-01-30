@@ -683,6 +683,12 @@ npx context-connectors index github --owner myorg --repo myrepo -i my-project --
 | `CC_S3_ENDPOINT` | Custom S3 endpoint URL |
 | `CC_S3_FORCE_PATH_STYLE` | Use path-style URLs (`true`/`false`, required for MinIO and most S3-compatible services) |
 
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+When making changes that affect public APIs or functionality, maintainers can use the `@update-docs` command in PR comments to automatically generate documentation updates.
+
 ## License
 
 MIT
