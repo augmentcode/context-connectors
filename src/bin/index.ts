@@ -29,5 +29,18 @@ program.addCommand(searchCommand);
 program.addCommand(mcpCommand);
 program.addCommand(agentCommand);
 
-program.parse();
+// Auto-detect URL mode: ctxc index <url> -> ctxc index url <url>
+// This allows users to skip the 'url' subcommand when providing a URL directly
+const indexIdx = process.argv.indexOf("index");
+if (indexIdx !== -1 && indexIdx + 1 < process.argv.length) {
+  const nextArg = process.argv[indexIdx + 1];
+  const subcommands = ["url", "github", "gitlab", "bitbucket", "website"];
+  if (
+    nextArg.match(/^https?:\/\//) &&
+    !subcommands.includes(nextArg)
+  ) {
+    process.argv.splice(indexIdx + 1, 0, "url");
+  }
+}
 
+program.parse();

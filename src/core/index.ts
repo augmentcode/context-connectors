@@ -25,3 +25,6 @@ export { sanitizeKey, isoTimestamp } from "./utils.js";
 export { Indexer } from "./indexer.js";
 export type { IndexerConfig } from "./indexer.js";
 
+export { parseSourceUrl } from "./url-parser.js";
+export type { ParsedUrl } from "./url-parser.js";
+
