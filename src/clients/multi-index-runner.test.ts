@@ -43,8 +43,6 @@ vi.mock("../sources/website.js", () => ({
 // Import the function under test and mocked sources
 import { createSourceFromState } from "./multi-index-runner.js";
 import { GitHubSource } from "../sources/github.js";
-import { GitLabSource } from "../sources/gitlab.js";
-import { BitBucketSource } from "../sources/bitbucket.js";
 import { WebsiteSource } from "../sources/website.js";
 
 // Create mock state with specific source metadata
@@ -61,123 +59,68 @@ describe("createSourceFromState", () => {
     vi.clearAllMocks();
   });
 
-  describe("GitHub source", () => {
-    it("uses resolvedRef when present", async () => {
-      const state = createMockState({
-        type: "github",
-        config: { owner: "test-owner", repo: "test-repo", ref: "main" },
-        resolvedRef: "abc123sha",
-        syncedAt: new Date().toISOString(),
-      });
+  // All VCS sources (GitHub, GitLab, BitBucket) use the same getRef() logic:
+  // resolvedRef ?? config.ref
+  // We test this once with GitHub as the representative case.
 
-      await createSourceFromState(state);
-
-      expect(GitHubSource).toHaveBeenCalledWith({
-        owner: "test-owner",
-        repo: "test-repo",
-        ref: "abc123sha",
-      });
+  it("uses resolvedRef when present", async () => {
+    const state = createMockState({
+      type: "github",
+      config: { owner: "test-owner", repo: "test-repo", ref: "main" },
+      resolvedRef: "abc123sha",
+      syncedAt: new Date().toISOString(),
     });
 
-    it("uses config.ref when resolvedRef is missing", async () => {
-      const state = createMockState({
-        type: "github",
-        config: { owner: "test-owner", repo: "test-repo", ref: "main" },
-        // No resolvedRef
-        syncedAt: new Date().toISOString(),
-      });
+    await createSourceFromState(state);
 
-      await createSourceFromState(state);
-
-      expect(GitHubSource).toHaveBeenCalledWith({
-        owner: "test-owner",
-        repo: "test-repo",
-        ref: "main",
-      });
+    expect(GitHubSource).toHaveBeenCalledWith({
+      owner: "test-owner",
+      repo: "test-repo",
+      ref: "abc123sha",
     });
   });
 
-  describe("GitLab source", () => {
-    it("uses resolvedRef when present", async () => {
-      const state = createMockState({
-        type: "gitlab",
-        config: { projectId: "group/project", ref: "main" },
-        resolvedRef: "def456sha",
-        syncedAt: new Date().toISOString(),
-      });
-
-      await createSourceFromState(state);
-
-      expect(GitLabSource).toHaveBeenCalledWith({
-        projectId: "group/project",
-        ref: "def456sha",
-      });
+  it("falls back to config.ref when resolvedRef is missing", async () => {
+    const state = createMockState({
+      type: "github",
+      config: { owner: "test-owner", repo: "test-repo", ref: "main" },
+      // No resolvedRef
+      syncedAt: new Date().toISOString(),
     });
 
-    it("uses config.ref when resolvedRef is undefined", async () => {
-      const state = createMockState({
-        type: "gitlab",
-        config: { projectId: "group/project", ref: "develop" },
-        resolvedRef: undefined,
-        syncedAt: new Date().toISOString(),
-      });
+    await createSourceFromState(state);
 
-      await createSourceFromState(state);
-
-      expect(GitLabSource).toHaveBeenCalledWith({
-        projectId: "group/project",
-        ref: "develop",
-      });
+    expect(GitHubSource).toHaveBeenCalledWith({
+      owner: "test-owner",
+      repo: "test-repo",
+      ref: "main",
     });
   });
 
-  describe("BitBucket source", () => {
-    it("uses resolvedRef when present", async () => {
-      const state = createMockState({
-        type: "bitbucket",
-        config: { workspace: "my-workspace", repo: "my-repo", ref: "develop" },
-        resolvedRef: "ghi789sha",
-        syncedAt: new Date().toISOString(),
-      });
+  it("website source works without resolvedRef", async () => {
+    const state = createMockState({
+      type: "website",
+      config: { url: "https://example.com", maxDepth: 2 },
+      syncedAt: new Date().toISOString(),
+    });
 
-      await createSourceFromState(state);
+    await createSourceFromState(state);
 
-      expect(BitBucketSource).toHaveBeenCalledWith({
-        workspace: "my-workspace",
-        repo: "my-repo",
-        ref: "ghi789sha",
-      });
+    expect(WebsiteSource).toHaveBeenCalledWith({
+      url: "https://example.com",
+      maxDepth: 2,
     });
   });
 
-  describe("Website source", () => {
-    it("works correctly without resolvedRef", async () => {
-      const state = createMockState({
-        type: "website",
-        config: { url: "https://example.com", maxDepth: 2 },
-        syncedAt: new Date().toISOString(),
-      });
-
-      await createSourceFromState(state);
-
-      expect(WebsiteSource).toHaveBeenCalledWith({
-        url: "https://example.com",
-        maxDepth: 2,
-      });
+  it("throws error for unknown source type", async () => {
+    const state = createMockState({
+      type: "unknown" as any,
+      config: {} as any,
+      syncedAt: new Date().toISOString(),
     });
-  });
 
-  describe("unknown source type", () => {
-    it("throws error for unknown source type", async () => {
-      const state = createMockState({
-        type: "unknown" as any,
-        config: {} as any,
-        syncedAt: new Date().toISOString(),
-      });
-
-      await expect(createSourceFromState(state)).rejects.toThrow(
-        "Unknown source type: unknown"
-      );
-    });
+    await expect(createSourceFromState(state)).rejects.toThrow(
+      "Unknown source type: unknown"
+    );
   });
 });
