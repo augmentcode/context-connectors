@@ -43,13 +43,22 @@ async function createSourceFromState(state: IndexStateSearchOnly): Promise<Sourc
   const meta = state.source;
   if (meta.type === "github") {
     const { GitHubSource } = await import("../sources/github.js");
-    return new GitHubSource(meta.config);
+    return new GitHubSource({
+      ...meta.config,
+      ref: meta.resolvedRef ?? meta.config.ref,
+    });
   } else if (meta.type === "gitlab") {
     const { GitLabSource } = await import("../sources/gitlab.js");
-    return new GitLabSource(meta.config);
+    return new GitLabSource({
+      ...meta.config,
+      ref: meta.resolvedRef ?? meta.config.ref,
+    });
   } else if (meta.type === "bitbucket") {
     const { BitBucketSource } = await import("../sources/bitbucket.js");
-    return new BitBucketSource(meta.config);
+    return new BitBucketSource({
+      ...meta.config,
+      ref: meta.resolvedRef ?? meta.config.ref,
+    });
   } else if (meta.type === "website") {
     const { WebsiteSource } = await import("../sources/website.js");
     return new WebsiteSource(meta.config);
