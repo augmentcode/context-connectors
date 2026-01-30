@@ -56,30 +56,20 @@ export interface MultiIndexRunnerConfig {
 export async function createSourceFromState(state: IndexStateSearchOnly): Promise<Source> {
   const meta = state.source;
 
-  // Helper to get the ref for VCS sources.
-  // Uses resolvedRef (indexed commit SHA) to ensure file operations match search results.
+  // For VCS sources, use resolvedRef (indexed commit SHA) if available.
+  // This ensures file operations (listFiles, readFile) return content from
+  // the same commit that was indexed, so results match search.
   // Falls back to config.ref for backwards compatibility with older indexes.
-  const getRef = (configRef: string | undefined, resolvedRef: string | undefined) =>
-    resolvedRef ?? configRef;
 
   if (meta.type === "github") {
     const { GitHubSource } = await import("../sources/github.js");
-    return new GitHubSource({
-      ...meta.config,
-      ref: getRef(meta.config.ref, meta.resolvedRef),
-    });
+    return new GitHubSource({ ...meta.config, ref: meta.resolvedRef ?? meta.config.ref });
   } else if (meta.type === "gitlab") {
     const { GitLabSource } = await import("../sources/gitlab.js");
-    return new GitLabSource({
-      ...meta.config,
-      ref: getRef(meta.config.ref, meta.resolvedRef),
-    });
+    return new GitLabSource({ ...meta.config, ref: meta.resolvedRef ?? meta.config.ref });
   } else if (meta.type === "bitbucket") {
     const { BitBucketSource } = await import("../sources/bitbucket.js");
-    return new BitBucketSource({
-      ...meta.config,
-      ref: getRef(meta.config.ref, meta.resolvedRef),
-    });
+    return new BitBucketSource({ ...meta.config, ref: meta.resolvedRef ?? meta.config.ref });
   } else if (meta.type === "website") {
     const { WebsiteSource } = await import("../sources/website.js");
     return new WebsiteSource(meta.config);
