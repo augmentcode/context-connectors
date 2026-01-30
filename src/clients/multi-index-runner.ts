@@ -38,8 +38,15 @@ export interface MultiIndexRunnerConfig {
   searchOnly?: boolean;
 }
 
-/** Create a Source from index state metadata */
-async function createSourceFromState(state: IndexStateSearchOnly): Promise<Source> {
+/**
+ * Create a Source from index state metadata.
+ *
+ * For VCS sources (GitHub, GitLab, BitBucket), uses `resolvedRef` (the indexed commit SHA)
+ * if available, falling back to `config.ref` (branch name) if not.
+ *
+ * @internal Exported for testing
+ */
+export async function createSourceFromState(state: IndexStateSearchOnly): Promise<Source> {
   const meta = state.source;
   if (meta.type === "github") {
     const { GitHubSource } = await import("../sources/github.js");
