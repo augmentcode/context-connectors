@@ -36,6 +36,11 @@ export interface MultiIndexRunnerConfig {
    * When true, only search is available.
    */
   searchOnly?: boolean;
+  /**
+   * Custom User-Agent string for analytics tracking.
+   * When provided, this is passed to SearchClient instances for API requests.
+   */
+  clientUserAgent?: string;
 }
 
 /** Create a Source from index state metadata */
@@ -65,6 +70,7 @@ async function createSourceFromState(state: IndexStateSearchOnly): Promise<Sourc
 export class MultiIndexRunner {
   private readonly store: IndexStoreReader;
   private readonly searchOnly: boolean;
+  private readonly clientUserAgent?: string;
   private readonly clientCache = new Map<string, SearchClient>();
 
   /** Available index names */
@@ -77,12 +83,14 @@ export class MultiIndexRunner {
     store: IndexStoreReader,
     indexNames: string[],
     indexes: IndexInfo[],
-    searchOnly: boolean
+    searchOnly: boolean,
+    clientUserAgent?: string
   ) {
     this.store = store;
     this.indexNames = indexNames;
     this.indexes = indexes;
     this.searchOnly = searchOnly;
+    this.clientUserAgent = clientUserAgent;
   }
 
   /**
@@ -132,7 +140,7 @@ export class MultiIndexRunner {
       throw new Error("No valid indexes available (all indexes failed to load)");
     }
 
-    return new MultiIndexRunner(store, validIndexNames, indexes, searchOnly);
+    return new MultiIndexRunner(store, validIndexNames, indexes, searchOnly, config.clientUserAgent);
   }
 
   /**
@@ -158,6 +166,7 @@ export class MultiIndexRunner {
         store: this.store,
         source,
         indexName,
+        clientUserAgent: this.clientUserAgent,
       });
       await client.initialize();
       this.clientCache.set(indexName, client);

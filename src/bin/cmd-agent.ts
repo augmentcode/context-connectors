@@ -7,6 +7,7 @@ import * as readline from "readline";
 import { CLIAgent, type Provider } from "../clients/cli-agent.js";
 import { MultiIndexRunner } from "../clients/multi-index-runner.js";
 import { CompositeStoreReader, parseIndexSpecs } from "../stores/index.js";
+import { buildClientUserAgent } from "../core/utils.js";
 
 const PROVIDER_DEFAULTS: Record<Provider, string> = {
   openai: "gpt-5-mini",
@@ -50,9 +51,13 @@ export const agentCommand = new Command("agent")
       const store = await CompositeStoreReader.fromSpecs(specs);
 
       // Create multi-index runner
+      // Build User-Agent for analytics tracking
+      const clientUserAgent = buildClientUserAgent("cli-agent");
+      
       const runner = await MultiIndexRunner.create({
         store,
         searchOnly: options.searchOnly,
+        clientUserAgent,
       });
 
       console.log("\x1b[1;36mContext Connectors Minimal Agent\x1b[0m");
@@ -73,6 +78,7 @@ export const agentCommand = new Command("agent")
         model,
         maxSteps: options.maxSteps,
         verbose: options.verbose,
+        clientUserAgent,
       });
       await agent.initialize();
 
