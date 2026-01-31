@@ -53,6 +53,11 @@ export interface IndexerConfig {
    * @default process.env.AUGMENT_API_URL
    */
   apiUrl?: string;
+  /**
+   * Custom User-Agent string for analytics tracking.
+   * When provided, this is sent to the Augment API for usage analytics.
+   */
+  clientUserAgent?: string;
 }
 
 /**
@@ -82,6 +87,7 @@ export interface IndexerConfig {
 export class Indexer {
   private readonly apiKey?: string;
   private readonly apiUrl?: string;
+  private readonly clientUserAgent?: string;
 
   /**
    * Create a new Indexer instance.
@@ -91,6 +97,7 @@ export class Indexer {
   constructor(config: IndexerConfig = {}) {
     this.apiKey = config.apiKey ?? process.env.AUGMENT_API_TOKEN;
     this.apiUrl = config.apiUrl ?? process.env.AUGMENT_API_URL;
+    this.clientUserAgent = config.clientUserAgent;
   }
 
   /**
@@ -191,6 +198,7 @@ export class Indexer {
     const context = await DirectContext.create({
       apiKey: this.apiKey,
       apiUrl: this.apiUrl,
+      clientUserAgent: this.clientUserAgent,
     });
 
     // Fetch all files from source
@@ -254,6 +262,7 @@ export class Indexer {
     const context = await DirectContext.import(previousState.contextState, {
       apiKey: this.apiKey,
       apiUrl: this.apiUrl,
+      clientUserAgent: this.clientUserAgent,
     });
 
     // Remove deleted files

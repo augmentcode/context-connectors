@@ -39,6 +39,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { IndexStoreReader } from "../stores/types.js";
 import { MultiIndexRunner } from "./multi-index-runner.js";
+import { buildClientUserAgent } from "../core/utils.js";
 import {
   SEARCH_DESCRIPTION,
   LIST_FILES_DESCRIPTION,
@@ -96,10 +97,14 @@ export async function createMCPServer(
   config: MCPServerConfig
 ): Promise<Server> {
   // Create shared runner for multi-index operations
+  // Build User-Agent for analytics tracking
+  const clientUserAgent = buildClientUserAgent("mcp");
+  
   const runner = await MultiIndexRunner.create({
     store: config.store,
     indexNames: config.indexNames,
     searchOnly: config.searchOnly,
+    clientUserAgent,
   });
 
   const { indexNames, indexes } = runner;
