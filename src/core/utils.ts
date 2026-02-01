@@ -2,7 +2,7 @@
  * Shared utility functions
  */
 
-import { createRequire } from "module";
+import { VERSION } from "../generated/version.js";
 
 /**
  * Sanitize a key for use in filenames/paths.
@@ -70,26 +70,6 @@ export interface MCPClientInfo {
   version?: string;
 }
 
-// Lazy-load version to avoid circular imports
-let cachedVersion: string | null = null;
-
-/**
- * Get the package version.
- * Returns "unknown" if package.json is not readable (e.g., in bundled environments).
- */
-function getVersion(): string {
-  if (cachedVersion === null) {
-    try {
-      const require = createRequire(import.meta.url);
-      const pkg = require('../../package.json');
-      cachedVersion = (pkg.version as string) ?? 'unknown';
-    } catch {
-      // In bundled/packaged environments, package.json may not be present
-      cachedVersion = 'unknown';
-    }
-  }
-  return cachedVersion;
-}
 
 /**
  * Sanitize a string for use in User-Agent per RFC 9110.
@@ -125,8 +105,8 @@ export function buildClientUserAgent(
   product: ClientProduct,
   mcpClientInfo?: MCPClientInfo
 ): string {
-  const version = getVersion();
-  const base = `augment.ctxc.${product}/${version}`;
+  
+  const base = `augment.ctxc.${product}/${VERSION}`;
   
   if (product === 'mcp' && mcpClientInfo) {
     // Sanitize MCP client info per RFC 9110 (same as auggie CLI)
