@@ -53,6 +53,8 @@ export function normalizePath(path: string): string {
 
 /**
  * Supported client interface types for User-Agent tracking.
+ * 
+ * Format matches auggie CLI: context-connectors/{version}/{interface}
  */
 export type ClientInterface =
   | 'cli-search'      // ctxc search command
@@ -68,7 +70,7 @@ export type ClientInterface =
  */
 export interface MCPClientInfo {
   name: string;
-  version: string;
+  version?: string;
 }
 
 // Lazy-load version to avoid circular imports
@@ -87,10 +89,18 @@ function getVersion(): string {
 }
 
 /**
+ * Sanitize a string for use in User-Agent per RFC 9110.
+ * Only allows: a-z A-Z 0-9 ! # $ % & ' * + . ^ _ ` | ~ -
+ */
+function sanitizeUserAgentToken(s: string, maxLen: number): string {
+  return s.replace(/[^a-zA-Z0-9!#$%&'*+.^_`|~-]/g, "-").slice(0, maxLen);
+}
+
+/**
  * Build a User-Agent string for analytics tracking.
  * 
- * Format: context-connectors/{version} via:{interface}
- * With MCP client: context-connectors/{version} via:mcp client:{name}/{version}
+ * Format matches auggie CLI style: context-connectors/{version}/{interface}
+ * With MCP client: context-connectors/{version}/mcp/{clientName}
  * 
  * @param clientInterface - The interface being used
  * @param mcpClientInfo - Optional MCP client info for mcp interface
@@ -98,18 +108,26 @@ function getVersion(): string {
  * 
  * @example
  * buildClientUserAgent('cli-search')
- * // => 'context-connectors/0.1.3 via:cli-search'
+ * // => 'context-connectors/0.1.3/cli-search'
  * 
  * buildClientUserAgent('mcp', { name: 'claude-desktop', version: '1.0.0' })
- * // => 'context-connectors/0.1.3 via:mcp client:claude-desktop/1.0.0'
+ * // => 'context-connectors/0.1.3/mcp/claude-desktop/1.0.0'
  */
 export function buildClientUserAgent(
   clientInterface: ClientInterface,
   mcpClientInfo?: MCPClientInfo
 ): string {
-  let ua = `context-connectors/${getVersion()} via:${clientInterface}`;
-  if (mcpClientInfo) {
-    ua += ` client:${mcpClientInfo.name}/${mcpClientInfo.version}`;
+  const version = getVersion();
+  
+  if (clientInterface === 'mcp' && mcpClientInfo) {
+    // Sanitize MCP client info per RFC 9110 (same as auggie CLI)
+    const name = sanitizeUserAgentToken(mcpClientInfo.name, 32);
+    const clientVersion = mcpClientInfo.version 
+      ? sanitizeUserAgentToken(mcpClientInfo.version, 8)
+      : undefined;
+    const clientName = clientVersion ? `${name}/${clientVersion}` : name;
+    return `context-connectors/${version}/mcp/${clientName}`;
   }
-  return ua;
+  
+  return `context-connectors/${version}/${clientInterface}`;
 }

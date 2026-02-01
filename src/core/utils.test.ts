@@ -1,46 +1,30 @@
-/**
- * Tests for utility functions
- */
-
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { buildClientUserAgent } from "./utils.js";
 
 describe("buildClientUserAgent", () => {
-  it("should build basic user agent for cli-search", () => {
+  it("should build User-Agent for CLI search", () => {
     const ua = buildClientUserAgent("cli-search");
-    expect(ua).toMatch(/^context-connectors\/\d+\.\d+\.\d+ via:cli-search$/);
+    expect(ua).toMatch(/^context-connectors\/[0-9]+\.[0-9]+\.[0-9]+\/cli-search$/);
   });
 
-  it("should build basic user agent for cli-index", () => {
-    const ua = buildClientUserAgent("cli-index");
-    expect(ua).toMatch(/^context-connectors\/\d+\.\d+\.\d+ via:cli-index$/);
-  });
-
-  it("should build basic user agent for mcp", () => {
+  it("should build User-Agent for MCP without client info", () => {
     const ua = buildClientUserAgent("mcp");
-    expect(ua).toMatch(/^context-connectors\/\d+\.\d+\.\d+ via:mcp$/);
+    expect(ua).toMatch(/^context-connectors\/[0-9]+\.[0-9]+\.[0-9]+\/mcp$/);
   });
 
-  it("should include MCP client info when provided", () => {
-    const ua = buildClientUserAgent("mcp", { name: "claude-desktop", version: "1.2.0" });
-    expect(ua).toMatch(/^context-connectors\/\d+\.\d+\.\d+ via:mcp client:claude-desktop\/1\.2\.0$/);
+  it("should build User-Agent for MCP with client info", () => {
+    const ua = buildClientUserAgent("mcp", { name: "claude-desktop", version: "1.0.0" });
+    expect(ua).toMatch(/^context-connectors\/[0-9]+\.[0-9]+\.[0-9]+\/mcp\/claude-desktop\/1\.0\.0$/);
   });
 
-  it("should handle all interface types", () => {
-    const interfaces = [
-      "cli-search",
-      "sdk-search",
-      "cli-index",
-      "sdk-index",
-      "mcp",
-      "cli-agent",
-      "sdk-agent-provider",
-    ] as const;
+  it("should build User-Agent for MCP with client name only", () => {
+    const ua = buildClientUserAgent("mcp", { name: "cursor" });
+    expect(ua).toMatch(/^context-connectors\/[0-9]+\.[0-9]+\.[0-9]+\/mcp\/cursor$/);
+  });
 
-    for (const iface of interfaces) {
-      const ua = buildClientUserAgent(iface);
-      expect(ua).toContain(`via:${iface}`);
-      expect(ua).toContain("context-connectors/");
-    }
+  it("should sanitize MCP client info", () => {
+    const ua = buildClientUserAgent("mcp", { name: "My App 2.0", version: "1.2.3-beta" });
+    // Spaces and other chars should be replaced with -
+    expect(ua).toMatch(/^context-connectors\/[0-9]+\.[0-9]+\.[0-9]+\/mcp\/My-App-2\.0\/1\.2\.3-be$/);
   });
 });
