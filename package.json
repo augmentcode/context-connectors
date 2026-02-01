@@ -24,7 +24,13 @@
     "format": "biome format --write .",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "prebuild": "node scripts/generate-version.js"
+    "prebuild": "node scripts/generate-version.js",
+    "pretest": "node scripts/generate-version.js",
+    "prepare": "node scripts/generate-version.js",
+    "precli": "node scripts/generate-version.js",
+    "precli:index": "node scripts/generate-version.js",
+    "precli:search": "node scripts/generate-version.js",
+    "pretest:integration": "node scripts/generate-version.js"
   },
   "keywords": [
     "augment",
