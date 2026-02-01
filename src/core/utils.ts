@@ -75,12 +75,18 @@ let cachedVersion: string | null = null;
 
 /**
  * Get the package version.
+ * Returns "unknown" if package.json is not readable (e.g., in bundled environments).
  */
 function getVersion(): string {
   if (cachedVersion === null) {
-    const require = createRequire(import.meta.url);
-    const pkg = require('../../package.json');
-    cachedVersion = (pkg.version as string) ?? '0.0.0';
+    try {
+      const require = createRequire(import.meta.url);
+      const pkg = require('../../package.json');
+      cachedVersion = (pkg.version as string) ?? 'unknown';
+    } catch {
+      // In bundled/packaged environments, package.json may not be present
+      cachedVersion = 'unknown';
+    }
   }
   return cachedVersion;
 }
