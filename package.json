@@ -25,12 +25,7 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "prebuild": "node scripts/generate-version.js",
-    "pretest": "node scripts/generate-version.js",
-    "prepare": "node scripts/generate-version.js",
-    "precli": "node scripts/generate-version.js",
-    "precli:index": "node scripts/generate-version.js",
-    "precli:search": "node scripts/generate-version.js",
-    "pretest:integration": "node scripts/generate-version.js"
+    "prepare": "node scripts/generate-version.js"
   },
   "keywords": [
     "augment",
@@ -75,7 +70,6 @@
     }
   },
   "dependencies": {
-    "@augmentcode/auggie-sdk": "^0.1.15",
     "cheerio": "^1.1.2",
     "commander": "^12.0.0",
     "ignore": "^5.3.0",

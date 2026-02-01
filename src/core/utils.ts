@@ -1,8 +1,36 @@
 /**
  * Shared utility functions
  */
+import { createRequire } from "node:module";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { VERSION } from "../generated/version.js";
+// Load VERSION with fallback for resilience
+// In production/bundled environments, the generated file is always present
+// In development edge cases (direct tsx without prebuild), falls back to "unknown"
+let VERSION = "unknown";
+try {
+  // Use createRequire for synchronous import that can be caught
+  const require = createRequire(import.meta.url);
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  
+  // Try .js first (compiled), then .ts (source/dev)
+  const jsPath = join(__dirname, "../generated/version.js");
+  const tsPath = join(__dirname, "../generated/version.ts");
+  
+  if (existsSync(jsPath)) {
+    const versionModule = require("../generated/version.js");
+    VERSION = versionModule.VERSION ?? "unknown";
+  } else if (existsSync(tsPath)) {
+    // In development/test with tsx, load the .ts file
+    const versionModule = require("../generated/version.ts");
+    VERSION = versionModule.VERSION ?? "unknown";
+  }
+} catch {
+  // Generated file doesn't exist or failed to load - use fallback
+  // User-Agent will still identify the product: augment.ctxc.cli/unknown
+}
 
 /**
  * Sanitize a key for use in filenames/paths.
@@ -73,10 +101,10 @@ export interface MCPClientInfo {
 
 /**
  * Sanitize a string for use in User-Agent per RFC 9110.
- * Only allows: a-z A-Z 0-9 \! # $ % & ' * + . ^ _ ` | ~ -
+ * Only allows: a-z A-Z 0-9 \! # $ % & ' * + . ^ _ \` | ~ -
  */
 function sanitizeUserAgentToken(s: string, maxLen: number): string {
-  return s.replace(/[^a-zA-Z0-9\!#$%&'*+.^_`|~-]/g, "-").slice(0, maxLen);
+  return s.replace(/[^a-zA-Z0-9\!#$%&'*+.^_\`|~-]/g, "-").slice(0, maxLen);
 }
 
 /**
