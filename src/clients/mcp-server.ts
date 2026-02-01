@@ -36,10 +36,11 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  InitializeRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { IndexStoreReader } from "../stores/types.js";
 import { MultiIndexRunner } from "./multi-index-runner.js";
-import { buildClientUserAgent } from "../core/utils.js";
+import { buildClientUserAgent, type MCPClientInfo } from "../core/utils.js";
 import {
   SEARCH_DESCRIPTION,
   LIST_FILES_DESCRIPTION,
@@ -125,6 +126,35 @@ export async function createMCPServer(
       },
     }
   );
+
+  // Set up a custom initialize handler to capture MCP client info
+  // We intercept the initialize request to update the User-Agent with client info
+  server.setRequestHandler(InitializeRequestSchema, async (request) => {
+    // Extract client info from the initialize request
+    const clientInfo = request.params.clientInfo;
+    if (clientInfo) {
+      const mcpClientInfo: MCPClientInfo = {
+        name: clientInfo.name,
+        version: clientInfo.version,
+      };
+      // Update the runner's User-Agent with MCP client info
+      const updatedUserAgent = buildClientUserAgent("mcp", mcpClientInfo);
+      runner.updateClientUserAgent(updatedUserAgent);
+    }
+
+    // Return the standard initialize response
+    // The Server class will merge our capabilities with the standard response
+    return {
+      protocolVersion: "2024-11-05",
+      serverInfo: {
+        name: config.serverName ?? "context-connectors",
+        version: config.version ?? "0.1.0",
+      },
+      capabilities: {
+        tools: {},
+      },
+    };
+  });
 
   // Define tool type for type safety
   type Tool = {

@@ -70,7 +70,7 @@ async function createSourceFromState(state: IndexStateSearchOnly): Promise<Sourc
 export class MultiIndexRunner {
   private readonly store: IndexStoreReader;
   private readonly searchOnly: boolean;
-  private readonly clientUserAgent?: string;
+  private clientUserAgent?: string;
   private readonly clientCache = new Map<string, SearchClient>();
 
   /** Available index names */
@@ -141,6 +141,17 @@ export class MultiIndexRunner {
     }
 
     return new MultiIndexRunner(store, validIndexNames, indexes, searchOnly, config.clientUserAgent);
+  }
+
+
+  /**
+   * Update the User-Agent string.
+   * 
+   * Call this after receiving MCP client info to include the client name/version.
+   * Note: Only affects future client creations, not existing cached clients.
+   */
+  updateClientUserAgent(newUserAgent: string): void {
+    this.clientUserAgent = newUserAgent;
   }
 
   /**
