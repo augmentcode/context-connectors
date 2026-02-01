@@ -23,9 +23,7 @@
     "test:integration": "tsx test/augment-provider.ts && tsx test/cli-agent.ts",
     "format": "biome format --write .",
     "lint": "biome check .",
-    "lint:fix": "biome check --write .",
-    "prebuild": "node scripts/generate-version.js",
-    "prepare": "node scripts/generate-version.js"
+    "lint:fix": "biome check --write ."
   },
   "keywords": [
     "augment",

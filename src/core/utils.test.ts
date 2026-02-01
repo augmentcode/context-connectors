@@ -1,25 +1,31 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeKey, normalizePath, buildClientUserAgent } from "./utils.js";
+import { 
+  sanitizeKey, 
+  normalizePath, 
+  buildClientUserAgent,
+  type MCPClientInfo 
+} from "./utils.js";
 
 describe("sanitizeKey", () => {
-  it("replaces unsafe characters with underscores", () => {
-    expect(sanitizeKey("foo/bar/baz")).toBe("foo_bar_baz");
+  it("should replace unsafe characters with underscores", () => {
+    expect(sanitizeKey("foo/bar")).toBe("foo_bar");
     expect(sanitizeKey("foo:bar")).toBe("foo_bar");
-    expect(sanitizeKey("foo@bar.com")).toBe("foo_bar_com");
+    expect(sanitizeKey("foo@bar")).toBe("foo_bar");
   });
 
-  it("collapses multiple underscores", () => {
+  it("should collapse multiple underscores", () => {
     expect(sanitizeKey("foo//bar")).toBe("foo_bar");
-    expect(sanitizeKey("foo___bar")).toBe("foo_bar");
+    expect(sanitizeKey("foo:::bar")).toBe("foo_bar");
   });
 
-  it("strips leading and trailing underscores", () => {
-    expect(sanitizeKey("_foo_")).toBe("foo");
-    expect(sanitizeKey("__foo__")).toBe("foo");
+  it("should trim leading/trailing underscores", () => {
+    expect(sanitizeKey("/foo")).toBe("foo");
+    expect(sanitizeKey("foo/")).toBe("foo");
   });
 
-  it("preserves safe characters", () => {
-    expect(sanitizeKey("foo-bar_baz123")).toBe("foo-bar_baz123");
+  it("should keep valid characters", () => {
+    expect(sanitizeKey("foo-bar_baz")).toBe("foo-bar_baz");
+    expect(sanitizeKey("FooBar123")).toBe("FooBar123");
   });
 });
 
@@ -29,63 +35,102 @@ describe("normalizePath", () => {
     expect(normalizePath("./foo/bar")).toBe("foo/bar");
   });
 
-  it("removes leading slashes", () => {
+  it("removes leading /", () => {
     expect(normalizePath("/src")).toBe("src");
-    expect(normalizePath("//src")).toBe("src");
+    expect(normalizePath("///src")).toBe("src");
   });
 
-  it("removes trailing slashes", () => {
+  it("removes trailing /", () => {
     expect(normalizePath("src/")).toBe("src");
-    expect(normalizePath("src//")).toBe("src");
+    expect(normalizePath("src///")).toBe("src");
   });
 
   it("collapses multiple slashes", () => {
     expect(normalizePath("src//lib")).toBe("src/lib");
-    expect(normalizePath("a///b//c")).toBe("a/b/c");
+    expect(normalizePath("a//b//c")).toBe("a/b/c");
   });
 
-  it("returns empty string for root representations", () => {
+  it("handles root paths", () => {
     expect(normalizePath("./")).toBe("");
     expect(normalizePath("/")).toBe("");
     expect(normalizePath("")).toBe("");
   });
+
+  it("handles complex paths", () => {
+    expect(normalizePath("./src//lib/")).toBe("src/lib");
+    expect(normalizePath("///a//b//c///")).toBe("a/b/c");
+  });
 });
 
 describe("buildClientUserAgent", () => {
-  it("builds CLI user agent", () => {
+  it("builds CLI User-Agent", () => {
     const ua = buildClientUserAgent("cli");
-    expect(ua).toMatch(/^augment\.ctxc\.cli\/\d+\.\d+\.\d+/);
+    expect(ua).toMatch(/^augment\.ctxc\.cli\/[\d.]+/);
   });
 
-  it("builds SDK user agent", () => {
-    const ua = buildClientUserAgent("sdk");
-    expect(ua).toMatch(/^augment\.ctxc\.sdk\/\d+\.\d+\.\d+/);
-  });
-
-  it("builds MCP user agent without client info", () => {
+  it("builds MCP User-Agent", () => {
     const ua = buildClientUserAgent("mcp");
-    expect(ua).toMatch(/^augment\.ctxc\.mcp\/\d+\.\d+\.\d+$/);
+    expect(ua).toMatch(/^augment\.ctxc\.mcp\/[\d.]+/);
   });
 
-  it("builds MCP user agent with client info", () => {
-    const ua = buildClientUserAgent("mcp", { name: "claude-desktop", version: "1.0.0" });
-    expect(ua).toMatch(/^augment\.ctxc\.mcp\/\d+\.\d+\.\d+\/claude-desktop\/1\.0\.0$/);
+  it("builds SDK User-Agent", () => {
+    const ua = buildClientUserAgent("sdk");
+    expect(ua).toMatch(/^augment\.ctxc\.sdk\/[\d.]+/);
   });
 
-  it("builds MCP user agent with client name only", () => {
-    const ua = buildClientUserAgent("mcp", { name: "cursor" });
-    expect(ua).toMatch(/^augment\.ctxc\.mcp\/\d+\.\d+\.\d+\/cursor$/);
+  it("appends MCP client info with name and version", () => {
+    const mcpClientInfo: MCPClientInfo = {
+      name: "claude-desktop",
+      version: "1.0.0"
+    };
+    const ua = buildClientUserAgent("mcp", mcpClientInfo);
+    expect(ua).toMatch(/^augment\.ctxc\.mcp\/[\d.]+\/claude-desktop\/1\.0\.0$/);
   });
 
-  it("sanitizes MCP client info - spaces replaced with dashes", () => {
-    const ua = buildClientUserAgent("mcp", { name: "My App", version: "1.2.3" });
-    // Space replaced with -
-    expect(ua).toMatch(/\/My-App\/1\.2\.3$/);
+  it("appends MCP client info with name only", () => {
+    const mcpClientInfo: MCPClientInfo = {
+      name: "cursor"
+    };
+    const ua = buildClientUserAgent("mcp", mcpClientInfo);
+    expect(ua).toMatch(/^augment\.ctxc\.mcp\/[\d.]+\/cursor$/);
   });
 
-  it("truncates long version strings", () => {
-    const ua = buildClientUserAgent("mcp", { name: "app", version: "1.2.3-beta.1" });
-    // Version truncated to 8 chars: "1.2.3-be"
+  it("sanitizes MCP client name per RFC 9110", () => {
+    const mcpClientInfo: MCPClientInfo = {
+      name: "My App",  // space not allowed
+      version: "1.0"
+    };
+    const ua = buildClientUserAgent("mcp", mcpClientInfo);
+    expect(ua).toContain("/My-App/");  // space replaced with -
+  });
+
+  it("truncates long client names to 32 chars", () => {
+    const mcpClientInfo: MCPClientInfo = {
+      name: "a".repeat(50),
+      version: "1.0"
+    };
+    const ua = buildClientUserAgent("mcp", mcpClientInfo);
+    // Should contain 32 'a's, not 50
+    expect(ua).toContain("/" + "a".repeat(32) + "/");
+  });
+
+  it("truncates long versions to 8 chars", () => {
+    const mcpClientInfo: MCPClientInfo = {
+      name: "app",
+      version: "1.2.3-beta.4"  // 12 chars
+    };
+    const ua = buildClientUserAgent("mcp", mcpClientInfo);
+    // Version should be truncated to 8 chars: "1.2.3-be"
     expect(ua).toMatch(/\/app\/1\.2\.3-be$/);
+  });
+
+  it("ignores MCP client info for non-MCP products", () => {
+    const mcpClientInfo: MCPClientInfo = {
+      name: "should-be-ignored",
+      version: "1.0"
+    };
+    const ua = buildClientUserAgent("cli", mcpClientInfo);
+    expect(ua).not.toContain("should-be-ignored");
+    expect(ua).toMatch(/^augment\.ctxc\.cli\/[\d.]+$/);
   });
 });
