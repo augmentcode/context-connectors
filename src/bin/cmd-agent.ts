@@ -52,7 +52,7 @@ export const agentCommand = new Command("agent")
 
       // Create multi-index runner
       // Build User-Agent for analytics tracking
-      const clientUserAgent = buildClientUserAgent("cli-agent");
+      const clientUserAgent = buildClientUserAgent("cli");
       
       const runner = await MultiIndexRunner.create({
         store,

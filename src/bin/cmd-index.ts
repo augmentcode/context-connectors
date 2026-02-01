@@ -51,7 +51,7 @@ async function runIndex(
 ) {
   console.log(`Indexing ${sourceType} source...`);
   const indexer = new Indexer({
-    clientUserAgent: buildClientUserAgent("cli-index"),
+    clientUserAgent: buildClientUserAgent("cli"),
   });
   const result = await indexer.index(source, store, indexKey);
 

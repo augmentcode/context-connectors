@@ -21,7 +21,7 @@ export {
 } from "./file-filter.js";
 
 export { sanitizeKey, isoTimestamp, buildClientUserAgent } from "./utils.js";
-export type { ClientInterface, MCPClientInfo } from "./utils.js";
+export type { ClientProduct, MCPClientInfo } from "./utils.js";
 
 export { Indexer } from "./indexer.js";
 export type { IndexerConfig } from "./indexer.js";
