@@ -54,7 +54,7 @@ export function normalizePath(path: string): string {
 /**
  * Supported client interface types for User-Agent tracking.
  * 
- * Format matches auggie CLI: context-connectors/{version}/{interface}
+ * Format matches auggie CLI: augment.ctxc/{version}/{interface}
  */
 export type ClientInterface =
   | 'cli-search'      // ctxc search command
@@ -99,8 +99,8 @@ function sanitizeUserAgentToken(s: string, maxLen: number): string {
 /**
  * Build a User-Agent string for analytics tracking.
  * 
- * Format matches auggie CLI style: context-connectors/{version}/{interface}
- * With MCP client: context-connectors/{version}/mcp/{clientName}
+ * Format matches auggie CLI style: augment.ctxc/{version}/{interface}
+ * With MCP client: augment.ctxc/{version}/mcp/{clientName}
  * 
  * @param clientInterface - The interface being used
  * @param mcpClientInfo - Optional MCP client info for mcp interface
@@ -108,10 +108,10 @@ function sanitizeUserAgentToken(s: string, maxLen: number): string {
  * 
  * @example
  * buildClientUserAgent('cli-search')
- * // => 'context-connectors/0.1.3/cli-search'
+ * // => 'augment.ctxc/0.1.3/cli-search'
  * 
  * buildClientUserAgent('mcp', { name: 'claude-desktop', version: '1.0.0' })
- * // => 'context-connectors/0.1.3/mcp/claude-desktop/1.0.0'
+ * // => 'augment.ctxc/0.1.3/mcp/claude-desktop/1.0.0'
  */
 export function buildClientUserAgent(
   clientInterface: ClientInterface,
@@ -126,8 +126,8 @@ export function buildClientUserAgent(
       ? sanitizeUserAgentToken(mcpClientInfo.version, 8)
       : undefined;
     const clientName = clientVersion ? `${name}/${clientVersion}` : name;
-    return `context-connectors/${version}/mcp/${clientName}`;
+    return `augment.ctxc/${version}/mcp/${clientName}`;
   }
   
-  return `context-connectors/${version}/${clientInterface}`;
+  return `augment.ctxc/${version}/${clientInterface}`;
 }
