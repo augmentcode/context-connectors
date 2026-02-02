@@ -38,6 +38,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { IndexStoreReader, IndexStore } from "../stores/types.js";
+import type { Source } from "../sources/types.js";
 import { MultiIndexRunner } from "./multi-index-runner.js";
 import {
   SEARCH_DESCRIPTION,
