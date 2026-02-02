@@ -376,6 +376,86 @@ export async function createMCPServer(
       }
     }
 
+    // Handle index_repo separately (uses 'name' not 'index_name')
+    if (name === "index_repo") {
+      const indexName = args?.name as string;
+      const sourceType = args?.source_type as string;
+
+      if (!indexName) {
+        return { content: [{ type: "text", text: "Error: name is required" }], isError: true };
+      }
+      if (!sourceType) {
+        return { content: [{ type: "text", text: "Error: source_type is required" }], isError: true };
+      }
+
+      try {
+        let source: Source;
+        let sourceDesc: string;
+
+        if (sourceType === "github") {
+          const owner = args?.owner as string;
+          const repo = args?.repo as string;
+          if (!owner || !repo) {
+            return { content: [{ type: "text", text: "Error: github requires owner and repo" }], isError: true };
+          }
+          const { GitHubSource } = await import("../sources/github.js");
+          source = new GitHubSource({ owner, repo, ref: (args?.ref as string) || "HEAD" });
+          sourceDesc = `github://${owner}/${repo}`;
+        } else if (sourceType === "gitlab") {
+          const projectId = args?.project_id as string;
+          if (!projectId) {
+            return { content: [{ type: "text", text: "Error: gitlab requires project_id" }], isError: true };
+          }
+          const { GitLabSource } = await import("../sources/gitlab.js");
+          source = new GitLabSource({ projectId, ref: (args?.ref as string) || "HEAD" });
+          sourceDesc = `gitlab://${projectId}`;
+        } else if (sourceType === "bitbucket") {
+          const workspace = args?.workspace as string;
+          const repo = args?.repo as string;
+          if (!workspace || !repo) {
+            return { content: [{ type: "text", text: "Error: bitbucket requires workspace and repo" }], isError: true };
+          }
+          const { BitBucketSource } = await import("../sources/bitbucket.js");
+          source = new BitBucketSource({ workspace, repo, ref: (args?.ref as string) || "HEAD" });
+          sourceDesc = `bitbucket://${workspace}/${repo}`;
+        } else if (sourceType === "website") {
+          const url = args?.url as string;
+          if (!url) {
+            return { content: [{ type: "text", text: "Error: website requires url" }], isError: true };
+          }
+          const { WebsiteSource } = await import("../sources/website.js");
+          source = new WebsiteSource({ url });
+          sourceDesc = `website://${url}`;
+        } else {
+          return { content: [{ type: "text", text: `Error: Unknown source_type: ${sourceType}` }], isError: true };
+        }
+
+        // Run indexer - need IndexStore for this
+        const { Indexer } = await import("../core/indexer.js");
+        const indexer = new Indexer();
+
+        // Check if store supports write operations
+        if (!('save' in config.store)) {
+          return { content: [{ type: "text", text: "Error: Store does not support write operations (index_repo requires IndexStore)" }], isError: true };
+        }
+
+        const result = await indexer.index(source, config.store as IndexStore, indexName);
+
+        // Refresh runner state
+        await runner.refreshIndexList();
+        runner.invalidateClient(indexName);
+
+        return {
+          content: [{
+            type: "text",
+            text: `Created index "${indexName}" from ${sourceDesc}\n- Type: ${result.type}\n- Files indexed: ${result.filesIndexed}\n- Duration: ${result.duration}ms`
+          }],
+        };
+      } catch (error) {
+        return { content: [{ type: "text", text: `Error indexing: ${error}` }], isError: true };
+      }
+    }
+
     try {
       const indexName = args?.index_name as string;
       const client = await runner.getClient(indexName);
