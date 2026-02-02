@@ -21,7 +21,7 @@ const stdioCommand = new Command("stdio")
       const indexSpecs: string[] | undefined = options.index;
 
       let store;
-      let indexNames: string[];
+      let indexNames: string[] | undefined;
 
       if (indexSpecs && indexSpecs.length > 0) {
         // Parse index specs and create composite store
@@ -31,13 +31,9 @@ const stdioCommand = new Command("stdio")
       } else {
         // No --index: use default store, list all indexes
         store = new FilesystemStore();
-        indexNames = await store.list();
-        if (indexNames.length === 0) {
-          console.error("Error: No indexes found.");
-          console.error("The MCP server requires at least one index to operate.");
-          console.error("Run 'ctxc index --help' to see how to create an index.");
-          process.exit(1);
-        }
+        // Dynamic indexing: server can start with zero indexes
+        // Use list_indexes to see available indexes, index_repo to create new ones
+        indexNames = undefined;
       }
 
       // Start MCP server (writes to stdout, reads from stdin)
@@ -84,13 +80,8 @@ const httpCommand = new Command("http")
       } else {
         // No --index: use default store, serve all
         store = new FilesystemStore();
-        const availableIndexes = await store.list();
-        if (availableIndexes.length === 0) {
-          console.error("Error: No indexes found.");
-          console.error("The MCP server requires at least one index to operate.");
-          console.error("Run 'ctxc index --help' to see how to create an index.");
-          process.exit(1);
-        }
+        // Dynamic indexing: server can start with zero indexes
+        // Use list_indexes to see available indexes, index_repo to create new ones
         indexNames = undefined;
       }
 
