@@ -150,6 +150,49 @@ export async function createMCPServer(
         },
       },
       {
+        name: "index_repo",
+        description: "Create or update an index from a repository. This may take 30+ seconds for large repos. The index will be available for search, list_files, and read_file after creation.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: {
+              type: "string",
+              description: "Unique name for this index (e.g., 'pytorch', 'my-lib')"
+            },
+            source_type: {
+              type: "string",
+              enum: ["github", "gitlab", "bitbucket", "website"],
+              description: "Type of source to index"
+            },
+            owner: {
+              type: "string",
+              description: "GitHub repository owner (required for github)"
+            },
+            repo: {
+              type: "string",
+              description: "Repository name (required for github, bitbucket)"
+            },
+            project_id: {
+              type: "string",
+              description: "GitLab project ID or path (required for gitlab)"
+            },
+            workspace: {
+              type: "string",
+              description: "BitBucket workspace slug (required for bitbucket)"
+            },
+            url: {
+              type: "string",
+              description: "URL to crawl (required for website)"
+            },
+            ref: {
+              type: "string",
+              description: "Branch, tag, or commit (default: HEAD)"
+            },
+          },
+          required: ["name", "source_type"],
+        },
+      },
+      {
         name: "search",
         description: searchDescription,
         inputSchema: {
@@ -173,6 +216,24 @@ export async function createMCPServer(
         },
       },
     ];
+
+    // Add delete_index if store supports it
+    if ('delete' in config.store) {
+      tools.push({
+        name: "delete_index",
+        description: "Delete an index by name. This removes the index from storage and it will no longer be available for search.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: {
+              type: "string",
+              description: "Name of the index to delete",
+            },
+          },
+          required: ["name"],
+        },
+      });
+    }
 
     // Only advertise file tools if not in search-only mode
     if (!searchOnly) {
@@ -276,6 +337,43 @@ export async function createMCPServer(
       return {
         content: [{ type: "text", text: `Available indexes:\n${lines.join("\n")}` }],
       };
+    }
+
+    // Handle delete_index separately (uses 'name' not 'index_name')
+    if (name === "delete_index") {
+      const indexName = args?.name as string;
+
+      if (!indexName) {
+        return { content: [{ type: "text", text: "Error: name is required" }], isError: true };
+      }
+
+      // Check if index exists
+      if (!runner.indexNames.includes(indexName)) {
+        return {
+          content: [{ type: "text", text: `Error: Index "${indexName}" not found` }],
+          isError: true,
+        };
+      }
+
+      // Check if store supports delete operations
+      if (!('delete' in config.store)) {
+        return { content: [{ type: "text", text: "Error: Store does not support delete operations" }], isError: true };
+      }
+
+      try {
+        // Delete from store
+        await (config.store as IndexStore).delete(indexName);
+
+        // Refresh runner state
+        await runner.refreshIndexList();
+        runner.invalidateClient(indexName);
+
+        return {
+          content: [{ type: "text", text: `Deleted index "${indexName}"` }],
+        };
+      } catch (error) {
+        return { content: [{ type: "text", text: `Error deleting index: ${error}` }], isError: true };
+      }
     }
 
     try {
