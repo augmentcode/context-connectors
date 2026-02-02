@@ -43,7 +43,7 @@ import {
   SEARCH_DESCRIPTION,
   LIST_FILES_DESCRIPTION,
   READ_FILE_DESCRIPTION,
-  withIndexList,
+  withListIndexesReference,
 } from "./tool-descriptions.js";
 
 /**
@@ -105,9 +105,6 @@ export async function createMCPServer(
   const { indexNames, indexes } = runner;
   const searchOnly = !runner.hasFileOperations();
 
-  // Format index list for tool descriptions
-  const indexListStr = runner.getIndexListString();
-
   // Create MCP server
   const server = new Server(
     {
@@ -135,14 +132,23 @@ export async function createMCPServer(
     };
   };
 
-  // Tool descriptions with available indexes (from shared module)
-  const searchDescription = withIndexList(SEARCH_DESCRIPTION, indexListStr);
-  const listFilesDescription = withIndexList(LIST_FILES_DESCRIPTION, indexListStr);
-  const readFileDescription = withIndexList(READ_FILE_DESCRIPTION, indexListStr);
+  // Tool descriptions with reference to list_indexes
+  const searchDescription = withListIndexesReference(SEARCH_DESCRIPTION);
+  const listFilesDescription = withListIndexesReference(LIST_FILES_DESCRIPTION);
+  const readFileDescription = withListIndexesReference(READ_FILE_DESCRIPTION);
 
   // List available tools
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     const tools: Tool[] = [
+      {
+        name: "list_indexes",
+        description: "List all available indexes with their metadata. Call this to discover what indexes are available before using search, list_files, or read_file tools.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+          required: [],
+        },
+      },
       {
         name: "search",
         description: searchDescription,
@@ -254,6 +260,23 @@ export async function createMCPServer(
   // Handle tool calls
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
+
+    // Handle list_indexes separately (no index_name required)
+    if (name === "list_indexes") {
+      await runner.refreshIndexList();
+      const { indexes } = runner;
+      if (indexes.length === 0) {
+        return {
+          content: [{ type: "text", text: "No indexes available. Use index_repo to create one." }],
+        };
+      }
+      const lines = indexes.map((i) =>
+        `- ${i.name} (${i.type}://${i.identifier}) - synced ${i.syncedAt}`
+      );
+      return {
+        content: [{ type: "text", text: `Available indexes:\n${lines.join("\n")}` }],
+      };
+    }
 
     try {
       const indexName = args?.index_name as string;
