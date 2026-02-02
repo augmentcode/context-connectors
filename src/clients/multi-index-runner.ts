@@ -7,7 +7,7 @@
  * @module clients/multi-index-runner
  */
 
-import type { IndexStoreReader } from "../stores/types.js";
+import type { IndexStoreReader, IndexStore } from "../stores/types.js";
 import type { Source } from "../sources/types.js";
 import type { IndexStateSearchOnly } from "../core/types.js";
 import { getSourceIdentifier, getResolvedRef } from "../core/types.js";
@@ -26,7 +26,7 @@ export interface IndexInfo {
 /** Configuration for MultiIndexRunner */
 export interface MultiIndexRunnerConfig {
   /** Store to load indexes from */
-  store: IndexStoreReader;
+  store: IndexStoreReader | IndexStore;
   /**
    * Index names to expose. If undefined, all indexes in the store are exposed.
    */
@@ -63,18 +63,18 @@ async function createSourceFromState(state: IndexStateSearchOnly): Promise<Sourc
  * Lazily initializes SearchClient instances as needed and caches them.
  */
 export class MultiIndexRunner {
-  private readonly store: IndexStoreReader;
+  private readonly store: IndexStoreReader | IndexStore;
   private readonly searchOnly: boolean;
   private readonly clientCache = new Map<string, SearchClient>();
 
   /** Available index names */
-  readonly indexNames: string[];
+  indexNames: string[];
 
   /** Metadata about available indexes */
-  readonly indexes: IndexInfo[];
+  indexes: IndexInfo[];
 
   private constructor(
-    store: IndexStoreReader,
+    store: IndexStoreReader | IndexStore,
     indexNames: string[],
     indexes: IndexInfo[],
     searchOnly: boolean
@@ -102,10 +102,6 @@ export class MultiIndexRunner {
       throw new Error(`Indexes not found: ${missingIndexes.join(", ")}`);
     }
 
-    if (indexNames.length === 0) {
-      throw new Error("No indexes available in store");
-    }
-
     // Load metadata for available indexes, filtering out any that fail to load
     const indexes: IndexInfo[] = [];
     const validIndexNames: string[] = [];
@@ -126,10 +122,6 @@ export class MultiIndexRunner {
       } catch {
         // Skip indexes that fail to load (e.g., corrupted or partial state)
       }
-    }
-
-    if (validIndexNames.length === 0) {
-      throw new Error("No valid indexes available (all indexes failed to load)");
     }
 
     return new MultiIndexRunner(store, validIndexNames, indexes, searchOnly);
@@ -163,6 +155,45 @@ export class MultiIndexRunner {
       this.clientCache.set(indexName, client);
     }
     return client;
+  }
+
+  /**
+   * Refresh the list of available indexes from the store.
+   * Call after adding or removing indexes.
+   */
+  async refreshIndexList(): Promise<void> {
+    const allIndexNames = await this.store.list();
+    const newIndexes: IndexInfo[] = [];
+    const newIndexNames: string[] = [];
+
+    for (const name of allIndexNames) {
+      try {
+        const state = await this.store.loadSearch(name);
+        if (state) {
+          newIndexNames.push(name);
+          newIndexes.push({
+            name,
+            type: state.source.type,
+            identifier: getSourceIdentifier(state.source),
+            ref: getResolvedRef(state.source),
+            syncedAt: state.source.syncedAt,
+          });
+        }
+      } catch {
+        // Skip indexes that fail to load
+      }
+    }
+
+    this.indexNames = newIndexNames;
+    this.indexes = newIndexes;
+  }
+
+  /**
+   * Invalidate cached SearchClient for an index.
+   * Call after updating an index to ensure fresh data on next access.
+   */
+  invalidateClient(indexName: string): void {
+    this.clientCache.delete(indexName);
   }
 
   /** Check if file operations are enabled */
