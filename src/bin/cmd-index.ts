@@ -7,6 +7,7 @@ import { Indexer } from "../core/indexer.js";
 import { Source } from "../sources/types.js";
 import { FilesystemStore } from "../stores/filesystem.js";
 import { getS3Config } from "../stores/s3-config.js";
+import { buildClientUserAgent } from "../core/utils.js";
 
 // Shared store options
 interface StoreOptions {
@@ -49,7 +50,9 @@ async function runIndex(
   sourceType: string
 ) {
   console.log(`Indexing ${sourceType} source...`);
-  const indexer = new Indexer();
+  const indexer = new Indexer({
+    clientUserAgent: buildClientUserAgent("cli"),
+  });
   const result = await indexer.index(source, store, indexKey);
 
   console.log(`\nIndexing complete!`);

@@ -66,6 +66,11 @@ export interface SearchClientConfig {
    * @default process.env.AUGMENT_API_URL
    */
   apiUrl?: string;
+  /**
+   * Custom User-Agent string for analytics tracking.
+   * When provided, this is sent to the Augment API for usage analytics.
+   */
+  clientUserAgent?: string;
 }
 
 /**
@@ -106,6 +111,7 @@ export class SearchClient {
   private indexName: string;
   private apiKey: string;
   private apiUrl: string;
+  private clientUserAgent?: string;
 
   private context: DirectContext | null = null;
   private state: IndexStateSearchOnly | null = null;
@@ -123,6 +129,7 @@ export class SearchClient {
     this.indexName = config.indexName;
     this.apiKey = config.apiKey ?? process.env.AUGMENT_API_TOKEN ?? "";
     this.apiUrl = config.apiUrl ?? process.env.AUGMENT_API_URL ?? "";
+    this.clientUserAgent = config.clientUserAgent;
   }
 
   /**
@@ -162,6 +169,7 @@ export class SearchClient {
     this.context = await DirectContext.import(this.state.contextState, {
       apiKey: this.apiKey,
       apiUrl: this.apiUrl,
+      clientUserAgent: this.clientUserAgent,
     });
   }
 

@@ -9,6 +9,7 @@ import { getSourceIdentifier } from "../core/types.js";
 import { getS3Config } from "../stores/s3-config.js";
 import { parseIndexSpec } from "../stores/index-spec.js";
 import type { IndexStoreReader } from "../stores/types.js";
+import { buildClientUserAgent } from "../core/utils.js";
 
 export const searchCommand = new Command("search")
   .description("Search indexed content and answer questions (use --raw for raw results)")
@@ -83,6 +84,7 @@ export const searchCommand = new Command("search")
       const client = new SearchClient({
         store,
         indexName: indexKey,
+        clientUserAgent: buildClientUserAgent("cli"),
       });
 
       await client.initialize();

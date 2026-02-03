@@ -39,13 +39,13 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { IndexStoreReader } from "../stores/types.js";
 import { MultiIndexRunner } from "./multi-index-runner.js";
+import { buildClientUserAgent, type MCPClientInfo } from "../core/utils.js";
 import {
   SEARCH_DESCRIPTION,
   LIST_FILES_DESCRIPTION,
   READ_FILE_DESCRIPTION,
   withIndexList,
 } from "./tool-descriptions.js";
-
 /**
  * Configuration for the MCP server.
  */
@@ -72,7 +72,6 @@ export interface MCPServerConfig {
    */
   version?: string;
 }
-
 /**
  * Create an MCP server instance.
  *
@@ -96,18 +95,19 @@ export async function createMCPServer(
   config: MCPServerConfig
 ): Promise<Server> {
   // Create shared runner for multi-index operations
+  // Build User-Agent for analytics tracking
+  const clientUserAgent = buildClientUserAgent("mcp");
+  
   const runner = await MultiIndexRunner.create({
     store: config.store,
     indexNames: config.indexNames,
     searchOnly: config.searchOnly,
+    clientUserAgent,
   });
-
   const { indexNames, indexes } = runner;
   const searchOnly = !runner.hasFileOperations();
-
   // Format index list for tool descriptions
   const indexListStr = runner.getIndexListString();
-
   // Create MCP server
   const server = new Server(
     {
@@ -120,7 +120,19 @@ export async function createMCPServer(
       },
     }
   );
-
+  // Use the SDK's oninitialized callback to capture MCP client info
+  // This preserves the SDK's protocol version negotiation
+  server.oninitialized = () => {
+    const clientInfo = server.getClientVersion();
+    if (clientInfo) {
+      const mcpClientInfo: MCPClientInfo = {
+        name: clientInfo.name,
+        version: clientInfo.version,
+      };
+      const updatedUserAgent = buildClientUserAgent("mcp", mcpClientInfo);
+      runner.updateClientUserAgent(updatedUserAgent);
+    }
+  };
   // Define tool type for type safety
   type Tool = {
     name: string;
@@ -134,12 +146,10 @@ export async function createMCPServer(
       required?: string[];
     };
   };
-
   // Tool descriptions with available indexes (from shared module)
   const searchDescription = withIndexList(SEARCH_DESCRIPTION, indexListStr);
   const listFilesDescription = withIndexList(LIST_FILES_DESCRIPTION, indexListStr);
   const readFileDescription = withIndexList(READ_FILE_DESCRIPTION, indexListStr);
-
   // List available tools
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     const tools: Tool[] = [
@@ -167,7 +177,6 @@ export async function createMCPServer(
         },
       },
     ];
-
     // Only advertise file tools if not in search-only mode
     if (!searchOnly) {
       tools.push(
@@ -247,18 +256,14 @@ export async function createMCPServer(
         }
       );
     }
-
     return { tools };
   });
-
   // Handle tool calls
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
-
     try {
       const indexName = args?.index_name as string;
       const client = await runner.getClient(indexName);
-
       switch (name) {
         case "search": {
           const result = await client.search(args?.query as string, {
@@ -270,7 +275,6 @@ export async function createMCPServer(
             ],
           };
         }
-
         case "list_files": {
           if (searchOnly) {
             return {
@@ -291,7 +295,6 @@ export async function createMCPServer(
             content: [{ type: "text", text }],
           };
         }
-
         case "read_file": {
           if (searchOnly) {
             return {
@@ -321,7 +324,6 @@ export async function createMCPServer(
             content: [{ type: "text", text: result.contents ?? "" }],
           };
         }
-
         default:
           return {
             content: [{ type: "text", text: `Unknown tool: ${name}` }],
@@ -335,10 +337,8 @@ export async function createMCPServer(
       };
     }
   });
-
   return server;
 }
-
 /**
  * Run an MCP server with stdio transport.
  *
@@ -369,4 +369,3 @@ export async function runMCPServer(config: MCPServerConfig): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
-
