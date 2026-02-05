@@ -209,7 +209,7 @@ websiteCommand.action(async (options) => {
 
 // URL-based indexing command (auto-detects source type)
 const urlCommand = new Command("url")
-  .description("Index from a URL (auto-detects source type)")
+  .description("Index from URL with auto-detection (used internally when URL is passed directly)")
   .argument("<url>", "URL of the repository or website to index")
   .option("--ref <ref>", "Branch, tag, or commit (overrides URL-detected ref)");
 addStoreOptions(urlCommand);
@@ -273,8 +273,9 @@ urlCommand.action(async (url: string, options) => {
 
 // Main index command
 export const indexCommand = new Command("index")
-  .description("Index a data source")
-  .addCommand(urlCommand)
+  .usage("<url> [options]\n       ctxc index <source> [options]")
+  .description("Index a data source\n\nExamples:\n  ctxc index https://github.com/owner/repo\n  ctxc index https://github.com/owner/repo -i myindex\n  ctxc index github --owner x --repo y")
+  .addCommand(urlCommand, { hidden: true })
   .addCommand(githubCommand)
   .addCommand(gitlabCommand)
   .addCommand(bitbucketCommand)
