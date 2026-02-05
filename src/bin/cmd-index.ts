@@ -273,7 +273,7 @@ urlCommand.action(async (url: string, options) => {
 
 // Main index command
 export const indexCommand = new Command("index")
-  .usage("<url> [options]\n       ctxc index <source> [options]")
+  .usage("<url | source> [options]")
   .description("Index a data source")
   .addHelpText('after', `
 Examples:
