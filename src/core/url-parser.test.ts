@@ -161,3 +161,60 @@ describe("parseSourceUrl", () => {
   });
 });
 
+
+describe("Edge cases", () => {
+  describe(".git suffix handling", () => {
+    it("strips .git suffix from GitHub URLs", () => {
+      const result = parseSourceUrl("https://github.com/owner/repo.git");
+      expect(result.type).toBe("github");
+      expect(result.config).toEqual({ owner: "owner", repo: "repo", ref: "HEAD" });
+      expect(result.defaultIndexName).toBe("repo");
+    });
+
+    it("strips .git suffix from GitLab URLs", () => {
+      const result = parseSourceUrl("https://gitlab.com/group/project.git");
+      expect(result.type).toBe("gitlab");
+      expect(result.config).toEqual({ projectId: "group/project", ref: "HEAD", baseUrl: undefined });
+      expect(result.defaultIndexName).toBe("project");
+    });
+
+    it("strips .git suffix from Bitbucket URLs", () => {
+      const result = parseSourceUrl("https://bitbucket.org/workspace/repo.git");
+      expect(result.type).toBe("bitbucket");
+      expect(result.config).toEqual({
+        workspace: "workspace",
+        repo: "repo",
+        ref: "HEAD",
+        baseUrl: undefined,
+      });
+      expect(result.defaultIndexName).toBe("repo");
+    });
+  });
+
+  describe("Conservative self-hosted detection", () => {
+    it("detects gitlab.company.com as GitLab", () => {
+      const result = parseSourceUrl("https://gitlab.company.com/team/project");
+      expect(result.type).toBe("gitlab");
+    });
+
+    it("does NOT match notgitlab.com as GitLab", () => {
+      const result = parseSourceUrl("https://notgitlab.com/some/path");
+      expect(result.type).toBe("website");
+    });
+
+    it("does NOT match mygitlabserver.com as GitLab", () => {
+      const result = parseSourceUrl("https://mygitlabserver.com/some/path");
+      expect(result.type).toBe("website");
+    });
+
+    it("detects bitbucket.company.com as Bitbucket", () => {
+      const result = parseSourceUrl("https://bitbucket.company.com/workspace/repo");
+      expect(result.type).toBe("bitbucket");
+    });
+
+    it("does NOT match notbitbucket.org as Bitbucket", () => {
+      const result = parseSourceUrl("https://notbitbucket.org/some/path");
+      expect(result.type).toBe("website");
+    });
+  });
+});

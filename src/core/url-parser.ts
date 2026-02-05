@@ -10,6 +10,14 @@ import type { BitBucketSourceConfig } from "../sources/bitbucket.js";
 import type { WebsiteSourceConfig } from "../sources/website.js";
 
 /**
+ * Strip .git suffix from repo/project names
+ */
+function stripGitSuffix(name: string): string {
+  return name.endsWith(".git") ? name.slice(0, -4) : name;
+}
+
+
+/**
  * Result of parsing a source URL
  */
 export interface ParsedUrl {
@@ -43,12 +51,12 @@ export function parseSourceUrl(urlString: string): ParsedUrl {
   }
 
   // GitLab (gitlab.com or hostname contains "gitlab")
-  if (hostname === "gitlab.com" || hostname.includes("gitlab")) {
+  if (hostname === "gitlab.com" || hostname.startsWith("gitlab.")) {
     return parseGitLabUrl(url);
   }
 
   // Bitbucket (bitbucket.org or hostname contains "bitbucket")
-  if (hostname === "bitbucket.org" || hostname.includes("bitbucket")) {
+  if (hostname === "bitbucket.org" || hostname.startsWith("bitbucket.")) {
     return parseBitBucketUrl(url);
   }
 
@@ -76,7 +84,7 @@ function parseGitHubUrl(url: URL): ParsedUrl {
   }
 
   const owner = pathParts[0];
-  const repo = pathParts[1];
+  const repo = stripGitSuffix(pathParts[1]);
   let ref = "HEAD";
 
   // Check for tree/branch or commit/sha patterns
@@ -121,6 +129,11 @@ function parseGitLabUrl(url: URL): ParsedUrl {
     }
   }
 
+  // Strip .git suffix from project name if present
+  const lastPart = projectParts[projectParts.length - 1];
+  if (lastPart.endsWith(".git")) {
+    projectParts[projectParts.length - 1] = stripGitSuffix(lastPart);
+  }
   const projectId = projectParts.join("/");
   const projectName = projectParts[projectParts.length - 1];
 
@@ -149,7 +162,7 @@ function parseBitBucketUrl(url: URL): ParsedUrl {
   }
 
   const workspace = pathParts[0];
-  const repo = pathParts[1];
+  const repo = stripGitSuffix(pathParts[1]);
   let ref = "HEAD";
 
   // Check for /src/branch or /branch/name patterns

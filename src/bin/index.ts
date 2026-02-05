@@ -30,16 +30,23 @@ program.addCommand(mcpCommand);
 program.addCommand(agentCommand);
 
 // Auto-detect URL mode: ctxc index <url> -> ctxc index url <url>
-// This allows users to skip the 'url' subcommand when providing a URL directly
+// Scan for URL anywhere after 'index' to support: ctxc index -i name https://...
 const indexIdx = process.argv.indexOf("index");
-if (indexIdx !== -1 && indexIdx + 1 < process.argv.length) {
-  const nextArg = process.argv[indexIdx + 1];
+if (indexIdx !== -1) {
   const subcommands = ["url", "github", "gitlab", "bitbucket", "website"];
-  if (
-    nextArg.match(/^https?:\/\//) &&
-    !subcommands.includes(nextArg)
-  ) {
-    process.argv.splice(indexIdx + 1, 0, "url");
+  // Find first URL-like argument after 'index'
+  for (let i = indexIdx + 1; i < process.argv.length; i++) {
+    const arg = process.argv[i];
+    // Stop if we hit a known subcommand
+    if (subcommands.includes(arg)) break;
+    // Found a URL - reorder args to put 'url' and the URL right after 'index'
+    if (arg.match(/^https?:\/\//)) {
+      // Remove the URL from its current position
+      process.argv.splice(i, 1);
+      // Insert 'url' <url> right after 'index'
+      process.argv.splice(indexIdx + 1, 0, "url", arg);
+      break;
+    }
   }
 }
 
