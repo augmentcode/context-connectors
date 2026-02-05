@@ -29,5 +29,15 @@ program.addCommand(searchCommand);
 program.addCommand(mcpCommand);
 program.addCommand(agentCommand);
 
-program.parse();
+// Auto-detect URL mode: ctxc index <url> -> ctxc index url <url>
+// URL must be the first argument after 'index' (like any subcommand)
+const indexIdx = process.argv.indexOf("index");
+if (indexIdx !== -1 && indexIdx + 1 < process.argv.length) {
+  const nextArg = process.argv[indexIdx + 1];
+  if (nextArg.match(/^https?:\/\//)) {
+    // Insert 'url' before the URL
+    process.argv.splice(indexIdx + 1, 0, "url");
+  }
+}
 
+program.parse();

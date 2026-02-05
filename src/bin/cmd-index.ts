@@ -8,6 +8,7 @@ import { Source } from "../sources/types.js";
 import { FilesystemStore } from "../stores/filesystem.js";
 import { getS3Config } from "../stores/s3-config.js";
 import { buildClientUserAgent } from "../core/utils.js";
+import { parseSourceUrl } from "../core/url-parser.js";
 
 // Shared store options
 interface StoreOptions {
@@ -206,9 +207,80 @@ websiteCommand.action(async (options) => {
   }
 });
 
+// URL-based indexing command (auto-detects source type)
+const urlCommand = new Command("url")
+  .description("Index from URL with auto-detection (used internally when URL is passed directly)")
+  .argument("<url>", "URL of the repository or website to index")
+  .option("--ref <ref>", "Branch, tag, or commit (overrides URL-detected ref)");
+addStoreOptions(urlCommand);
+urlCommand.action(async (url: string, options) => {
+  try {
+    // Parse the URL to determine source type and config
+    const parsed = parseSourceUrl(url);
+    const indexKey = options.index || parsed.defaultIndexName;
+
+    let source: Source;
+
+    switch (parsed.type) {
+      case "github": {
+        const { GitHubSource } = await import("../sources/github.js");
+        const config = parsed.config as import("../sources/github.js").GitHubSourceConfig;
+        source = new GitHubSource({
+          ...config,
+          ref: options.ref || config.ref,
+        });
+        break;
+      }
+      case "gitlab": {
+        const { GitLabSource } = await import("../sources/gitlab.js");
+        const config = parsed.config as import("../sources/gitlab.js").GitLabSourceConfig;
+        source = new GitLabSource({
+          ...config,
+          ref: options.ref || config.ref,
+        });
+        break;
+      }
+      case "bitbucket": {
+        const { BitBucketSource } = await import("../sources/bitbucket.js");
+        const config = parsed.config as import("../sources/bitbucket.js").BitBucketSourceConfig;
+        source = new BitBucketSource({
+          ...config,
+          ref: options.ref || config.ref,
+        });
+        break;
+      }
+      case "website": {
+        const { WebsiteSource } = await import("../sources/website.js");
+        const config = parsed.config as import("../sources/website.js").WebsiteSourceConfig;
+        source = new WebsiteSource(config);
+        break;
+      }
+      default:
+        throw new Error(`Unknown source type: ${parsed.type}`);
+    }
+
+    const store = await createStore(options);
+    await runIndex(source, store, indexKey, parsed.type);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("Invalid")) {
+      console.error(`Error parsing URL: ${error.message}`);
+    } else {
+      console.error("Indexing failed:", error);
+    }
+    process.exit(1);
+  }
+});
+
 // Main index command
 export const indexCommand = new Command("index")
+  .usage("<url | source> [options]")
   .description("Index a data source")
+  .addHelpText('after', `
+Examples:
+  ctxc index https://github.com/owner/repo
+  ctxc index https://github.com/owner/repo -i myindex
+  ctxc index github --owner x --repo y`)
+  .addCommand(urlCommand, { hidden: true })
   .addCommand(githubCommand)
   .addCommand(gitlabCommand)
   .addCommand(bitbucketCommand)
