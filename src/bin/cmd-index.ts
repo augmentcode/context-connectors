@@ -273,8 +273,13 @@ urlCommand.action(async (url: string, options) => {
 
 // Main index command
 export const indexCommand = new Command("index")
-  .usage("<url> [options]\n       ctxc index <source> [options]")
-  .description("Index a data source\n\nExamples:\n  ctxc index https://github.com/owner/repo\n  ctxc index https://github.com/owner/repo -i myindex\n  ctxc index github --owner x --repo y")
+  .usage("<url | source> [options]")
+  .description("Index a data source")
+  .addHelpText('after', `
+Examples:
+  ctxc index https://github.com/owner/repo
+  ctxc index https://github.com/owner/repo -i myindex
+  ctxc index github --owner x --repo y`)
   .addCommand(urlCommand, { hidden: true })
   .addCommand(githubCommand)
   .addCommand(gitlabCommand)
