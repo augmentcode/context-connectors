@@ -53,7 +53,7 @@ const stdioCommand = new Command("stdio")
         store,
         indexNames,
         searchOnly: options.searchOnly,
-        agentManaged: !indexSpecs || indexSpecs.length === 0,
+        agentManaged,
       });
     } catch (error) {
       // Write errors to stderr (stdout is for MCP protocol)
@@ -127,7 +127,7 @@ const httpCommand = new Command("http")
         store,
         indexNames,
         searchOnly: options.searchOnly,
-        agentManaged: !indexSpecs || indexSpecs.length === 0,
+        agentManaged,
         port: parseInt(options.port, 10),
         host: options.host,
         cors,
