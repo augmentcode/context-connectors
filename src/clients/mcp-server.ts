@@ -103,7 +103,6 @@ export async function createMCPServer(
     searchOnly: config.searchOnly,
   });
 
-  const { indexNames, indexes } = runner;
   const searchOnly = !runner.hasFileOperations();
 
   // Create MCP server
@@ -151,6 +150,32 @@ export async function createMCPServer(
         },
       },
       {
+        name: "search",
+        description: searchDescription,
+        inputSchema: {
+          type: "object",
+          properties: {
+            index_name: {
+              type: "string",
+              description: "Name of the index to search.",
+            },
+            query: {
+              type: "string",
+              description: "Natural language description of what you're looking for.",
+            },
+            maxChars: {
+              type: "number",
+              description: "Maximum characters in response (optional).",
+            },
+          },
+          required: ["index_name", "query"],
+        },
+      },
+    ];
+
+    // Add index_repo if store supports write operations
+    if ('save' in config.store) {
+      tools.push({
         name: "index_repo",
         description: "Create or update an index from a repository. This may take 30+ seconds for large repos. The index will be available for search, list_files, and read_file after creation.",
         inputSchema: {
@@ -192,31 +217,8 @@ export async function createMCPServer(
           },
           required: ["name", "source_type"],
         },
-      },
-      {
-        name: "search",
-        description: searchDescription,
-        inputSchema: {
-          type: "object",
-          properties: {
-            index_name: {
-              type: "string",
-              description: "Name of the index to search.",
-              enum: indexNames,
-            },
-            query: {
-              type: "string",
-              description: "Natural language description of what you're looking for.",
-            },
-            maxChars: {
-              type: "number",
-              description: "Maximum characters in response (optional).",
-            },
-          },
-          required: ["index_name", "query"],
-        },
-      },
-    ];
+      });
+    }
 
     // Add delete_index if store supports it
     if ('delete' in config.store) {
@@ -248,7 +250,6 @@ export async function createMCPServer(
               index_name: {
                 type: "string",
                 description: "Name of the index.",
-                enum: indexNames,
               },
               directory: {
                 type: "string",
@@ -279,7 +280,6 @@ export async function createMCPServer(
               index_name: {
                 type: "string",
                 description: "Name of the index.",
-                enum: indexNames,
               },
               path: {
                 type: "string",
