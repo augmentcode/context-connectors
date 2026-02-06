@@ -45,6 +45,7 @@ import {
   LIST_FILES_DESCRIPTION,
   READ_FILE_DESCRIPTION,
   withListIndexesReference,
+  withIndexList,
 } from "./tool-descriptions.js";
 
 /**
@@ -72,6 +73,13 @@ export interface MCPServerConfig {
    * @default "0.1.0"
    */
   version?: string;
+  /**
+   * Agent-managed mode flag.
+   * When true: use withListIndexesReference (no enum in schemas)
+   * When false/undefined: use withIndexList (include enum in schemas)
+   * @default false
+   */
+  agentManaged?: boolean;
 }
 
 /**
@@ -132,10 +140,23 @@ export async function createMCPServer(
     };
   };
 
-  // Tool descriptions with reference to list_indexes
-  const searchDescription = withListIndexesReference(SEARCH_DESCRIPTION);
-  const listFilesDescription = withListIndexesReference(LIST_FILES_DESCRIPTION);
-  const readFileDescription = withListIndexesReference(READ_FILE_DESCRIPTION);
+  // Tool descriptions: use enum in fixed mode, reference in agent-managed mode
+  let searchDescription: string;
+  let listFilesDescription: string;
+  let readFileDescription: string;
+
+  if (config.agentManaged) {
+    // Agent-managed mode: use reference to list_indexes (no enum)
+    searchDescription = withListIndexesReference(SEARCH_DESCRIPTION);
+    listFilesDescription = withListIndexesReference(LIST_FILES_DESCRIPTION);
+    readFileDescription = withListIndexesReference(READ_FILE_DESCRIPTION);
+  } else {
+    // Fixed mode: include enum with index list
+    const indexListStr = runner.getIndexListString();
+    searchDescription = withIndexList(SEARCH_DESCRIPTION, indexListStr);
+    listFilesDescription = withIndexList(LIST_FILES_DESCRIPTION, indexListStr);
+    readFileDescription = withIndexList(READ_FILE_DESCRIPTION, indexListStr);
+  }
 
   // List available tools
   server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -158,6 +179,7 @@ export async function createMCPServer(
             index_name: {
               type: "string",
               description: "Name of the index to search.",
+              ...(config.agentManaged ? {} : { enum: runner.indexes.map(i => i.name) }),
             },
             query: {
               type: "string",
@@ -250,6 +272,7 @@ export async function createMCPServer(
               index_name: {
                 type: "string",
                 description: "Name of the index.",
+                ...(config.agentManaged ? {} : { enum: runner.indexes.map(i => i.name) }),
               },
               directory: {
                 type: "string",
@@ -280,6 +303,7 @@ export async function createMCPServer(
               index_name: {
                 type: "string",
                 description: "Name of the index.",
+                ...(config.agentManaged ? {} : { enum: runner.indexes.map(i => i.name) }),
               },
               path: {
                 type: "string",
