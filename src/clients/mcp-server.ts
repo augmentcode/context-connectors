@@ -75,8 +75,8 @@ export interface MCPServerConfig {
   version?: string;
   /**
    * Discovery mode flag.
-   * When true: use withListIndexesReference (no enum in schemas), no write tools
-   * When false/undefined: use withIndexList (include enum in schemas), write tools available
+   * When true: use withListIndexesReference (no enum in schemas), dynamic index list
+   * When false/undefined: use withIndexList (include enum in schemas), static index list
    * @default false
    */
   discovery?: boolean;
@@ -296,19 +296,26 @@ export async function createMCPServer(
 
     // Handle list_indexes separately (no index_name required)
     if (name === "list_indexes") {
-      await runner.refreshIndexList();
-      const { indexes } = runner;
-      if (indexes.length === 0) {
+      try {
+        await runner.refreshIndexList();
+        const { indexes } = runner;
+        if (indexes.length === 0) {
+          return {
+            content: [{ type: "text", text: "No indexes available. Use `ctxc index` CLI to create one." }],
+          };
+        }
+        const lines = indexes.map((i) =>
+          `- ${i.name} (${i.type}://${i.identifier}) - synced ${i.syncedAt}`
+        );
         return {
-          content: [{ type: "text", text: "No indexes available. Use index_repo to create one." }],
+          content: [{ type: "text", text: `Available indexes:\n${lines.join("\n")}` }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Error listing indexes: ${error}` }],
+          isError: true,
         };
       }
-      const lines = indexes.map((i) =>
-        `- ${i.name} (${i.type}://${i.identifier}) - synced ${i.syncedAt}`
-      );
-      return {
-        content: [{ type: "text", text: `Available indexes:\n${lines.join("\n")}` }],
-      };
     }
 
     try {

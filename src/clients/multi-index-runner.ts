@@ -152,10 +152,7 @@ export class MultiIndexRunner {
       }
     }
 
-    if (validIndexNames.length === 0) {
-      throw new Error("No valid indexes available (all indexes failed to load)");
-    }
-
+    // Allow empty - server can start with no indexes and user can add via CLI
     return new MultiIndexRunner(store, validIndexNames, indexes, searchOnly, config.clientUserAgent);
   }
 
