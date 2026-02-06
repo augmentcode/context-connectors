@@ -7,6 +7,7 @@ import { FilesystemStore } from "../stores/filesystem.js";
 import { runMCPServer } from "../clients/mcp-server.js";
 import { parseIndexSpecs } from "../stores/index-spec.js";
 import { CompositeStoreReader } from "../stores/composite.js";
+import { ReadOnlyLayeredStore } from "../stores/read-only-layered-store.js";
 
 // stdio subcommand (stdio-based MCP server for local clients like Claude Desktop)
 const stdioCommand = new Command("stdio")
@@ -20,28 +21,34 @@ const stdioCommand = new Command("stdio")
   .action(async (options) => {
     try {
       const indexSpecs: string[] | undefined = options.index;
-      const discovery = options.discovery || !indexSpecs || indexSpecs.length === 0;
+      const discoveryFlag = options.discovery;
 
       let store;
       let indexNames: string[] | undefined;
+      let discovery: boolean;
 
-      if (indexSpecs && indexSpecs.length > 0) {
-        // Parse index specs
+      if (discoveryFlag && indexSpecs && indexSpecs.length > 0) {
+        // Discovery mode WITH remote indexes: merge local + remote
+        const specs = parseIndexSpecs(indexSpecs);
+        const remoteStore = await CompositeStoreReader.fromSpecs(specs);
+        const localStore = new FilesystemStore();
+        store = new ReadOnlyLayeredStore(localStore, remoteStore);
+        indexNames = undefined; // Discovery mode: no fixed list
+        discovery = true;
+      } else if (indexSpecs && indexSpecs.length > 0) {
+        // Fixed mode: use read-only CompositeStoreReader
         const specs = parseIndexSpecs(indexSpecs);
         indexNames = specs.map((s) => s.displayName);
-
-        // Fixed mode: use read-only CompositeStoreReader
         store = await CompositeStoreReader.fromSpecs(specs);
+        discovery = false;
       } else {
-        // No --index: use FilesystemStore (discovery mode)
+        // Discovery mode only: use FilesystemStore
         store = new FilesystemStore();
-        // Discovery mode: server can start with zero indexes
-        // Use list_indexes to see available indexes, manage via CLI
         indexNames = undefined;
+        discovery = true;
       }
 
       // Start MCP server (writes to stdout, reads from stdin)
-      // discovery: true when no -i flags (discovery mode), false when -i flags provided (fixed mode)
       await runMCPServer({
         store,
         indexNames,
@@ -75,24 +82,31 @@ const httpCommand = new Command("http")
   .action(async (options) => {
     try {
       const indexSpecs: string[] | undefined = options.index;
-      const discovery = options.discovery || !indexSpecs || indexSpecs.length === 0;
+      const discoveryFlag = options.discovery;
 
       let store;
       let indexNames: string[] | undefined;
+      let discovery: boolean;
 
-      if (indexSpecs && indexSpecs.length > 0) {
-        // Parse index specs
+      if (discoveryFlag && indexSpecs && indexSpecs.length > 0) {
+        // Discovery mode WITH remote indexes: merge local + remote
+        const specs = parseIndexSpecs(indexSpecs);
+        const remoteStore = await CompositeStoreReader.fromSpecs(specs);
+        const localStore = new FilesystemStore();
+        store = new ReadOnlyLayeredStore(localStore, remoteStore);
+        indexNames = undefined; // Discovery mode: no fixed list
+        discovery = true;
+      } else if (indexSpecs && indexSpecs.length > 0) {
+        // Fixed mode: use read-only CompositeStoreReader
         const specs = parseIndexSpecs(indexSpecs);
         indexNames = specs.map((s) => s.displayName);
-
-        // Fixed mode: use read-only CompositeStoreReader
         store = await CompositeStoreReader.fromSpecs(specs);
+        discovery = false;
       } else {
-        // No --index: use FilesystemStore (discovery mode)
+        // Discovery mode only: use FilesystemStore
         store = new FilesystemStore();
-        // Discovery mode: server can start with zero indexes
-        // Use list_indexes to see available indexes, manage via CLI
         indexNames = undefined;
+        discovery = true;
       }
 
       // Parse CORS option
@@ -108,7 +122,6 @@ const httpCommand = new Command("http")
       const apiKey = options.apiKey ?? process.env.MCP_API_KEY;
 
       // Start HTTP server
-      // discovery: true when no -i flags (discovery mode), false when -i flags provided (fixed mode)
       const { runMCPHttpServer } = await import("../clients/mcp-http-server.js");
       const server = await runMCPHttpServer({
         store,
