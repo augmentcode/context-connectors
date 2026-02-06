@@ -1,18 +1,17 @@
 /**
- * Tests for createSourceFromState
+ * Tests for MultiIndexRunner
  *
- * These tests verify that createSourceFromState correctly uses resolvedRef
+ * Tests for createSourceFromState verify that it correctly uses resolvedRef
  * from state metadata when creating source instances.
  *
- * We mock GitHub and Website sources to capture what config gets passed
- * to the constructors, without needing API credentials.
- *
- * Since all VCS sources (GitHub, GitLab, BitBucket) use the same getRef() logic,
- * we only test GitHub as the representative case.
+ * Tests for MultiIndexRunner.refreshIndexList verify that it respects
+ * the fixed mode allowlist when refreshing the index list.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { IndexStateSearchOnly, SourceMetadata } from "../core/types.js";
+import type { IndexStateSearchOnly, SourceMetadata, IndexState } from "../core/types.js";
+import type { IndexStoreReader } from "../stores/types.js";
+import { MultiIndexRunner } from "./multi-index-runner.js";
 
 // Mock only the sources we actually test
 vi.mock("../sources/github.js", () => ({
@@ -111,5 +110,130 @@ describe("createSourceFromState", () => {
     await expect(createSourceFromState(state)).rejects.toThrow(
       "Unknown source type: unknown"
     );
+  });
+});
+
+describe("MultiIndexRunner.refreshIndexList", () => {
+  // Helper to create a mock store with multiple indexes
+  const createMockStoreWithIndexes = (indexNames: string[]): IndexStoreReader => {
+    const mockState = (name: string): IndexState => ({
+      version: 1,
+      contextState: { version: 1 } as any,
+      source: {
+        type: "github",
+        config: { owner: "test", repo: name },
+        syncedAt: new Date().toISOString(),
+      },
+    });
+
+    return {
+      loadState: vi.fn(),
+      loadSearch: vi.fn().mockImplementation((name: string) => {
+        if (indexNames.includes(name)) {
+          return Promise.resolve(mockState(name));
+        }
+        return Promise.resolve(null);
+      }),
+      list: vi.fn().mockResolvedValue(indexNames),
+    };
+  };
+
+  it("in discovery mode, refreshIndexList includes all indexes from store", async () => {
+    const store = createMockStoreWithIndexes(["pytorch", "react", "docs"]);
+
+    const runner = await MultiIndexRunner.create({
+      store,
+      // No indexNames = discovery mode
+    });
+
+    expect(runner.indexNames).toEqual(["pytorch", "react", "docs"]);
+
+    // Simulate store gaining a new index
+    (store.list as any).mockResolvedValue(["pytorch", "react", "docs", "vue"]);
+    (store.loadSearch as any).mockImplementation((name: string) => {
+      if (["pytorch", "react", "docs", "vue"].includes(name)) {
+        return Promise.resolve({
+          version: 1,
+          contextState: { version: 1 } as any,
+          source: {
+            type: "github",
+            config: { owner: "test", repo: name },
+            syncedAt: new Date().toISOString(),
+          },
+        });
+      }
+      return Promise.resolve(null);
+    });
+
+    await runner.refreshIndexList();
+    expect(runner.indexNames).toEqual(["pytorch", "react", "docs", "vue"]);
+  });
+
+  it("in fixed mode, refreshIndexList respects the original allowlist", async () => {
+    const store = createMockStoreWithIndexes(["pytorch", "react", "docs"]);
+
+    // Create runner in fixed mode with only pytorch and react
+    const runner = await MultiIndexRunner.create({
+      store,
+      indexNames: ["pytorch", "react"],
+    });
+
+    expect(runner.indexNames).toEqual(["pytorch", "react"]);
+
+    // Simulate store gaining a new index (docs is already there, vue is new)
+    (store.list as any).mockResolvedValue(["pytorch", "react", "docs", "vue"]);
+    (store.loadSearch as any).mockImplementation((name: string) => {
+      if (["pytorch", "react", "docs", "vue"].includes(name)) {
+        return Promise.resolve({
+          version: 1,
+          contextState: { version: 1 } as any,
+          source: {
+            type: "github",
+            config: { owner: "test", repo: name },
+            syncedAt: new Date().toISOString(),
+          },
+        });
+      }
+      return Promise.resolve(null);
+    });
+
+    await runner.refreshIndexList();
+
+    // Should still only include pytorch and react, not docs or vue
+    expect(runner.indexNames).toEqual(["pytorch", "react"]);
+  });
+
+  it("in fixed mode, refreshIndexList handles missing indexes gracefully", async () => {
+    const store = createMockStoreWithIndexes(["pytorch", "react"]);
+
+    // Create runner in fixed mode with pytorch, react, and a missing index
+    const runner = await MultiIndexRunner.create({
+      store,
+      indexNames: ["pytorch", "react"],
+    });
+
+    expect(runner.indexNames).toEqual(["pytorch", "react"]);
+
+    // Simulate pytorch being deleted from store
+    (store.list as any).mockResolvedValue(["react"]);
+    (store.loadSearch as any).mockImplementation((name: string) => {
+      if (name === "react") {
+        return Promise.resolve({
+          version: 1,
+          contextState: { version: 1 } as any,
+          source: {
+            type: "github",
+            config: { owner: "test", repo: name },
+            syncedAt: new Date().toISOString(),
+          },
+        });
+      }
+      return Promise.resolve(null);
+    });
+
+    await runner.refreshIndexList();
+
+    // Should only include react (pytorch is gone from store)
+    expect(runner.indexNames).toEqual(["react"]);
   });
 });

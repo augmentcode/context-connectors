@@ -92,6 +92,7 @@ export class MultiIndexRunner {
   private readonly searchOnly: boolean;
   private clientUserAgent?: string;
   private readonly clientCache = new Map<string, SearchClient>();
+  private readonly originalIndexNames: string[] | undefined;
 
   /** Available index names */
   indexNames: string[];
@@ -104,13 +105,15 @@ export class MultiIndexRunner {
     indexNames: string[],
     indexes: IndexInfo[],
     searchOnly: boolean,
-    clientUserAgent?: string
+    clientUserAgent?: string,
+    originalIndexNames?: string[]
   ) {
     this.store = store;
     this.indexNames = indexNames;
     this.indexes = indexes;
     this.searchOnly = searchOnly;
     this.clientUserAgent = clientUserAgent;
+    this.originalIndexNames = originalIndexNames;
   }
 
   /**
@@ -123,6 +126,9 @@ export class MultiIndexRunner {
     // Discover available indexes
     const allIndexNames = await store.list();
     const indexNames = config.indexNames ?? allIndexNames;
+
+    // In fixed mode, save the original allowlist for later filtering
+    const originalIndexNames = config.indexNames ? [...config.indexNames] : undefined;
 
     // Validate requested indexes exist
     const missingIndexes = indexNames.filter((n) => !allIndexNames.includes(n));
@@ -153,7 +159,7 @@ export class MultiIndexRunner {
     }
 
     // Allow empty - server can start with no indexes and user can add via CLI
-    return new MultiIndexRunner(store, validIndexNames, indexes, searchOnly, config.clientUserAgent);
+    return new MultiIndexRunner(store, validIndexNames, indexes, searchOnly, config.clientUserAgent, originalIndexNames);
   }
 
   /**
@@ -200,13 +206,22 @@ export class MultiIndexRunner {
   /**
    * Refresh the list of available indexes from the store.
    * Call after adding or removing indexes.
+   *
+   * In fixed mode (when originalIndexNames is set), only includes indexes
+   * from the original allowlist, even if other indexes exist in the store.
    */
   async refreshIndexList(): Promise<void> {
     const allIndexNames = await this.store.list();
+
+    // In fixed mode, filter to only the original allowlist
+    const indexNamesToLoad = this.originalIndexNames
+      ? allIndexNames.filter(name => this.originalIndexNames!.includes(name))
+      : allIndexNames;
+
     const newIndexes: IndexInfo[] = [];
     const newIndexNames: string[] = [];
 
-    for (const name of allIndexNames) {
+    for (const name of indexNamesToLoad) {
       try {
         const state = await this.store.loadSearch(name);
         if (state) {
