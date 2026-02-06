@@ -7,6 +7,7 @@ import { FilesystemStore } from "../stores/filesystem.js";
 import { runMCPServer } from "../clients/mcp-server.js";
 import { parseIndexSpecs } from "../stores/index-spec.js";
 import { CompositeStoreReader } from "../stores/composite.js";
+import { LayeredStore } from "../stores/index.js";
 
 // stdio subcommand (stdio-based MCP server for local clients like Claude Desktop)
 const stdioCommand = new Command("stdio")
@@ -15,21 +16,31 @@ const stdioCommand = new Command("stdio")
     "-i, --index <specs...>",
     "Index spec(s): name, path:/path, or s3://bucket/key"
   )
+  .option("--agent-managed", "Enable dynamic index management (index_repo, delete_index)")
   .option("--search-only", "Disable list_files/read_file tools (search only)")
   .action(async (options) => {
     try {
       const indexSpecs: string[] | undefined = options.index;
+      const agentManaged = options.agentManaged || !indexSpecs || indexSpecs.length === 0;
 
       let store;
       let indexNames: string[] | undefined;
 
       if (indexSpecs && indexSpecs.length > 0) {
-        // Parse index specs and create composite store
+        // Parse index specs
         const specs = parseIndexSpecs(indexSpecs);
-        store = await CompositeStoreReader.fromSpecs(specs);
         indexNames = specs.map((s) => s.displayName);
+
+        if (agentManaged) {
+          // Agent-managed + remote indexes: use LayeredStore
+          const remoteStore = await CompositeStoreReader.fromSpecs(specs);
+          store = new LayeredStore(new FilesystemStore(), remoteStore);
+        } else {
+          // Fixed mode: use read-only CompositeStoreReader
+          store = await CompositeStoreReader.fromSpecs(specs);
+        }
       } else {
-        // No --index: use default store, list all indexes
+        // No --index: use FilesystemStore (agent-managed mode)
         store = new FilesystemStore();
         // Dynamic indexing: server can start with zero indexes
         // Use list_indexes to see available indexes, index_repo to create new ones
@@ -37,10 +48,12 @@ const stdioCommand = new Command("stdio")
       }
 
       // Start MCP server (writes to stdout, reads from stdin)
+      // agentManaged: true when no -i flags (dynamic mode), false when -i flags provided (fixed mode)
       await runMCPServer({
         store,
         indexNames,
         searchOnly: options.searchOnly,
+        agentManaged: !indexSpecs || indexSpecs.length === 0,
       });
     } catch (error) {
       // Write errors to stderr (stdout is for MCP protocol)
@@ -56,6 +69,7 @@ const httpCommand = new Command("http")
     "-i, --index <specs...>",
     "Index spec(s): name, path:/path, or s3://bucket/key"
   )
+  .option("--agent-managed", "Enable dynamic index management (index_repo, delete_index)")
   .option("--port <number>", "Port to listen on", "3000")
   .option("--host <host>", "Host to bind to", "localhost")
   .option("--cors <origins>", "CORS origins (comma-separated, or '*' for any)")
@@ -68,17 +82,26 @@ const httpCommand = new Command("http")
   .action(async (options) => {
     try {
       const indexSpecs: string[] | undefined = options.index;
+      const agentManaged = options.agentManaged || !indexSpecs || indexSpecs.length === 0;
 
       let store;
       let indexNames: string[] | undefined;
 
       if (indexSpecs && indexSpecs.length > 0) {
-        // Parse index specs and create composite store
+        // Parse index specs
         const specs = parseIndexSpecs(indexSpecs);
-        store = await CompositeStoreReader.fromSpecs(specs);
         indexNames = specs.map((s) => s.displayName);
+
+        if (agentManaged) {
+          // Agent-managed + remote indexes: use LayeredStore
+          const remoteStore = await CompositeStoreReader.fromSpecs(specs);
+          store = new LayeredStore(new FilesystemStore(), remoteStore);
+        } else {
+          // Fixed mode: use read-only CompositeStoreReader
+          store = await CompositeStoreReader.fromSpecs(specs);
+        }
       } else {
-        // No --index: use default store, serve all
+        // No --index: use FilesystemStore (agent-managed mode)
         store = new FilesystemStore();
         // Dynamic indexing: server can start with zero indexes
         // Use list_indexes to see available indexes, index_repo to create new ones
@@ -98,11 +121,13 @@ const httpCommand = new Command("http")
       const apiKey = options.apiKey ?? process.env.MCP_API_KEY;
 
       // Start HTTP server
+      // agentManaged: true when no -i flags (dynamic mode), false when -i flags provided (fixed mode)
       const { runMCPHttpServer } = await import("../clients/mcp-http-server.js");
       const server = await runMCPHttpServer({
         store,
         indexNames,
         searchOnly: options.searchOnly,
+        agentManaged: !indexSpecs || indexSpecs.length === 0,
         port: parseInt(options.port, 10),
         host: options.host,
         cors,
