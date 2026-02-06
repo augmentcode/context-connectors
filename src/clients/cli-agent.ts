@@ -192,7 +192,6 @@ async function loadModel(
       return new AugmentLanguageModel(modelName, {
         apiKey: credentials.apiKey,
         apiUrl: credentials.apiUrl,
-        clientUserAgent,
       }) as unknown as LanguageModel;
     }
     default:
