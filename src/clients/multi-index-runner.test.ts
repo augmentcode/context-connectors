@@ -203,10 +203,10 @@ describe("MultiIndexRunner.refreshIndexList", () => {
     expect(runner.indexNames).toEqual(["pytorch", "react"]);
   });
 
-  it("in fixed mode, refreshIndexList handles missing indexes gracefully", async () => {
+  it("in fixed mode, refreshIndexList is a no-op even when indexes are deleted", async () => {
     const store = createMockStoreWithIndexes(["pytorch", "react"]);
 
-    // Create runner in fixed mode with pytorch, react, and a missing index
+    // Create runner in fixed mode with pytorch and react
     const runner = await MultiIndexRunner.create({
       store,
       indexNames: ["pytorch", "react"],
@@ -233,7 +233,7 @@ describe("MultiIndexRunner.refreshIndexList", () => {
 
     await runner.refreshIndexList();
 
-    // Should only include react (pytorch is gone from store)
-    expect(runner.indexNames).toEqual(["react"]);
+    // In fixed mode, the list should remain unchanged even though pytorch was deleted
+    expect(runner.indexNames).toEqual(["pytorch", "react"]);
   });
 });

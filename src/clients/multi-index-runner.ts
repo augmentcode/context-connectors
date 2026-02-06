@@ -207,21 +207,24 @@ export class MultiIndexRunner {
    * Refresh the list of available indexes from the store.
    * Call after adding or removing indexes.
    *
-   * In fixed mode (when originalIndexNames is set), only includes indexes
-   * from the original allowlist, even if other indexes exist in the store.
+   * In fixed mode (when originalIndexNames is set), this is a no-op.
+   * The list is completely static and never changes.
+   *
+   * In discovery mode, refreshes from the store to pick up new/deleted indexes.
    */
   async refreshIndexList(): Promise<void> {
-    const allIndexNames = await this.store.list();
+    // In fixed mode, the list is static - don't refresh
+    if (this.originalIndexNames) {
+      return;
+    }
 
-    // In fixed mode, filter to only the original allowlist
-    const indexNamesToLoad = this.originalIndexNames
-      ? allIndexNames.filter(name => this.originalIndexNames!.includes(name))
-      : allIndexNames;
+    // Discovery mode: refresh from store
+    const allIndexNames = await this.store.list();
 
     const newIndexes: IndexInfo[] = [];
     const newIndexNames: string[] = [];
 
-    for (const name of indexNamesToLoad) {
+    for (const name of allIndexNames) {
       try {
         const state = await this.store.loadSearch(name);
         if (state) {
