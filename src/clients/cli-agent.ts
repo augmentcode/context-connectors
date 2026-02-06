@@ -79,6 +79,12 @@ export interface CLIAgentSingleConfig {
   stream?: boolean;
   /** Custom system prompt. Uses a sensible default if not provided. */
   systemPrompt?: string;
+  /**
+   * Custom User-Agent string for analytics tracking.
+   * When provided, this is sent to the Augment API for usage analytics.
+   * Only used when provider is 'augment'.
+   */
+  clientUserAgent?: string;
 }
 
 /**
@@ -110,6 +116,12 @@ export interface CLIAgentMultiConfig {
   stream?: boolean;
   /** Custom system prompt. Uses a sensible default if not provided. */
   systemPrompt?: string;
+  /**
+   * Custom User-Agent string for analytics tracking.
+   * When provided, this is sent to the Augment API for usage analytics.
+   * Only used when provider is 'augment'.
+   */
+  clientUserAgent?: string;
 }
 
 /** Configuration for the CLI agent */
@@ -136,7 +148,8 @@ Be concise but thorough. Reference specific files and line numbers when helpful.
  */
 async function loadModel(
   provider: Provider,
-  modelName: string
+  modelName: string,
+  clientUserAgent?: string
 ): Promise<LanguageModel> {
   switch (provider) {
     case "openai": {
@@ -179,6 +192,7 @@ async function loadModel(
       return new AugmentLanguageModel(modelName, {
         apiKey: credentials.apiKey,
         apiUrl: credentials.apiUrl,
+        clientUserAgent,
       }) as unknown as LanguageModel;
     }
     default:
@@ -223,6 +237,7 @@ export class CLIAgent {
   private readonly verbose: boolean;
   private readonly stream: boolean;
   private readonly systemPrompt: string;
+  private readonly clientUserAgent?: string;
   private readonly tools: ToolSet;
   private messages: CoreMessage[] = [];
 
@@ -242,6 +257,7 @@ export class CLIAgent {
     this.verbose = config.verbose ?? false;
     this.stream = config.stream ?? true;
     this.systemPrompt = config.systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
+    this.clientUserAgent = config.clientUserAgent;
     this.tools = this.runner ? this.createMultiIndexTools() : this.createSingleClientTools();
   }
 
@@ -393,7 +409,7 @@ export class CLIAgent {
    * @throws Error if the provider package is not installed
    */
   async initialize(): Promise<void> {
-    this.model = await loadModel(this.provider, this.modelName);
+    this.model = await loadModel(this.provider, this.modelName, this.clientUserAgent);
   }
 
   /**

@@ -20,7 +20,7 @@
     "cli": "tsx src/bin/index.ts",
     "cli:index": "tsx src/bin/index.ts index",
     "cli:search": "tsx src/bin/index.ts search",
-    "test:integration": "tsx test/augment-provider.ts && tsx test/cli-agent.ts",
+    "test:integration": "tsx test/augment-provider.ts && tsx test/cli-agent.ts && tsx test/resolved-ref.ts",
     "format": "biome format --write .",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
@@ -68,7 +68,7 @@
     }
   },
   "dependencies": {
-    "@augmentcode/auggie-sdk": "^0.1.14",
+    "@augmentcode/auggie-sdk": "^0.1.15",
     "cheerio": "^1.1.2",
     "commander": "^12.0.0",
     "ignore": "^5.3.0",

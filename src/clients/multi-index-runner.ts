@@ -36,20 +36,45 @@ export interface MultiIndexRunnerConfig {
    * When true, only search is available.
    */
   searchOnly?: boolean;
+  /**
+   * Custom User-Agent string for analytics tracking.
+   * When provided, this is passed to SearchClient instances for API requests.
+   */
+  clientUserAgent?: string;
 }
 
-/** Create a Source from index state metadata */
-async function createSourceFromState(state: IndexStateSearchOnly): Promise<Source> {
+/**
+ * Create a Source from index state metadata.
+ *
+ * For VCS sources (GitHub, GitLab, BitBucket), uses `resolvedRef` (the indexed commit SHA)
+ * if available, falling back to `config.ref` (branch name) if not.
+ *
+ * **Why resolvedRef matters:**
+ * - `resolvedRef` is the exact commit SHA that was indexed for search
+ * - Using it ensures `listFiles` and `readFile` return content from the same commit
+ *   that was indexed, so file operations match search results
+ * - If we used `config.ref` (branch name), the branch might have moved since indexing,
+ *   causing file operations to return different content than what search indexed
+ *
+ * @internal Exported for testing
+ */
+export async function createSourceFromState(state: IndexStateSearchOnly): Promise<Source> {
   const meta = state.source;
+
+  // For VCS sources, use resolvedRef (indexed commit SHA) if available.
+  // This ensures file operations (listFiles, readFile) return content from
+  // the same commit that was indexed, so results match search.
+  // Falls back to config.ref for backwards compatibility with older indexes.
+
   if (meta.type === "github") {
     const { GitHubSource } = await import("../sources/github.js");
-    return new GitHubSource(meta.config);
+    return new GitHubSource({ ...meta.config, ref: meta.resolvedRef ?? meta.config.ref });
   } else if (meta.type === "gitlab") {
     const { GitLabSource } = await import("../sources/gitlab.js");
-    return new GitLabSource(meta.config);
+    return new GitLabSource({ ...meta.config, ref: meta.resolvedRef ?? meta.config.ref });
   } else if (meta.type === "bitbucket") {
     const { BitBucketSource } = await import("../sources/bitbucket.js");
-    return new BitBucketSource(meta.config);
+    return new BitBucketSource({ ...meta.config, ref: meta.resolvedRef ?? meta.config.ref });
   } else if (meta.type === "website") {
     const { WebsiteSource } = await import("../sources/website.js");
     return new WebsiteSource(meta.config);
@@ -65,6 +90,7 @@ async function createSourceFromState(state: IndexStateSearchOnly): Promise<Sourc
 export class MultiIndexRunner {
   private readonly store: IndexStoreReader | IndexStore;
   private readonly searchOnly: boolean;
+  private clientUserAgent?: string;
   private readonly clientCache = new Map<string, SearchClient>();
 
   /** Available index names */
@@ -77,12 +103,14 @@ export class MultiIndexRunner {
     store: IndexStoreReader | IndexStore,
     indexNames: string[],
     indexes: IndexInfo[],
-    searchOnly: boolean
+    searchOnly: boolean,
+    clientUserAgent?: string
   ) {
     this.store = store;
     this.indexNames = indexNames;
     this.indexes = indexes;
     this.searchOnly = searchOnly;
+    this.clientUserAgent = clientUserAgent;
   }
 
   /**
@@ -124,7 +152,21 @@ export class MultiIndexRunner {
       }
     }
 
-    return new MultiIndexRunner(store, validIndexNames, indexes, searchOnly);
+    if (validIndexNames.length === 0) {
+      throw new Error("No valid indexes available (all indexes failed to load)");
+    }
+
+    return new MultiIndexRunner(store, validIndexNames, indexes, searchOnly, config.clientUserAgent);
+  }
+
+  /**
+   * Update the User-Agent string.
+   *
+   * Call this after receiving MCP client info to include the client name/version.
+   * Note: Only affects future client creations, not existing cached clients.
+   */
+  updateClientUserAgent(newUserAgent: string): void {
+    this.clientUserAgent = newUserAgent;
   }
 
   /**
@@ -150,6 +192,7 @@ export class MultiIndexRunner {
         store: this.store,
         source,
         indexName,
+        clientUserAgent: this.clientUserAgent,
       });
       await client.initialize();
       this.clientCache.set(indexName, client);
