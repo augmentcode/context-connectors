@@ -169,6 +169,7 @@ export class SearchClient {
     this.context = await DirectContext.import(this.state.contextState, {
       apiKey: this.apiKey,
       apiUrl: this.apiUrl,
+      clientUserAgent: this.clientUserAgent,
     });
   }
 
