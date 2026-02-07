@@ -106,12 +106,13 @@ export async function createMCPServer(
   // Create shared runner for multi-index operations
   // Build User-Agent for analytics tracking
   const clientUserAgent = buildClientUserAgent("mcp");
-  
+
   const runner = await MultiIndexRunner.create({
     store: config.store,
     indexNames: config.indexNames,
     searchOnly: config.searchOnly,
     clientUserAgent,
+    discovery: config.discovery,
   });
 
   const { indexNames, indexes } = runner;

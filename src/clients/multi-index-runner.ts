@@ -41,6 +41,13 @@ export interface MultiIndexRunnerConfig {
    * When provided, this is passed to SearchClient instances for API requests.
    */
   clientUserAgent?: string;
+  /**
+   * Discovery mode flag.
+   * When true: allow empty index list (user can add indexes later via CLI)
+   * When false: require at least one valid index to be loaded
+   * @default false
+   */
+  discovery?: boolean;
 }
 
 /**
@@ -122,6 +129,7 @@ export class MultiIndexRunner {
   static async create(config: MultiIndexRunnerConfig): Promise<MultiIndexRunner> {
     const store = config.store;
     const searchOnly = config.searchOnly ?? false;
+    const discovery = config.discovery ?? false;
 
     // Discover available indexes
     const allIndexNames = await store.list();
@@ -158,7 +166,11 @@ export class MultiIndexRunner {
       }
     }
 
-    // Allow empty - server can start with no indexes and user can add via CLI
+    // In fixed mode (non-discovery), require at least one valid index
+    if (!discovery && validIndexNames.length === 0) {
+      throw new Error("No valid indexes loaded. Fixed mode requires at least one index.");
+    }
+
     return new MultiIndexRunner(store, validIndexNames, indexes, searchOnly, config.clientUserAgent, originalIndexNames);
   }
 

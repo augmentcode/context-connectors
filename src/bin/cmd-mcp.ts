@@ -42,10 +42,17 @@ const stdioCommand = new Command("stdio")
         store = await CompositeStoreReader.fromSpecs(specs);
         discovery = false;
       } else {
-        // Discovery mode only: use FilesystemStore
+        // No flags: restore original behavior - fail fast if no indexes
         store = new FilesystemStore();
-        indexNames = undefined;
-        discovery = true;
+        const availableIndexes = await store.list();
+        if (availableIndexes.length === 0) {
+          console.error("Error: No indexes found.");
+          console.error("The MCP server requires at least one index to operate.");
+          console.error("Run 'ctxc index --help' to see how to create an index.");
+          process.exit(1);
+        }
+        indexNames = availableIndexes;
+        discovery = false;
       }
 
       // Start MCP server (writes to stdout, reads from stdin)
@@ -103,10 +110,17 @@ const httpCommand = new Command("http")
         store = await CompositeStoreReader.fromSpecs(specs);
         discovery = false;
       } else {
-        // Discovery mode only: use FilesystemStore
+        // No flags: restore original behavior - fail fast if no indexes
         store = new FilesystemStore();
-        indexNames = undefined;
-        discovery = true;
+        const availableIndexes = await store.list();
+        if (availableIndexes.length === 0) {
+          console.error("Error: No indexes found.");
+          console.error("The MCP server requires at least one index to operate.");
+          console.error("Run 'ctxc index --help' to see how to create an index.");
+          process.exit(1);
+        }
+        indexNames = availableIndexes;
+        discovery = false;
       }
 
       // Parse CORS option
