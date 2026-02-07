@@ -244,6 +244,13 @@ export class MultiIndexRunner {
 
     this.indexNames = newIndexNames;
     this.indexes = newIndexes;
+
+    // Prune stale cache entries for removed indexes
+    for (const cachedName of this.clientCache.keys()) {
+      if (!newIndexNames.includes(cachedName)) {
+        this.clientCache.delete(cachedName);
+      }
+    }
   }
 
   /**

@@ -236,4 +236,52 @@ describe("MultiIndexRunner.refreshIndexList", () => {
     // In fixed mode, the list should remain unchanged even though pytorch was deleted
     expect(runner.indexNames).toEqual(["pytorch", "react"]);
   });
+
+  it("in discovery mode, refreshIndexList prunes stale cache entries", async () => {
+    const store = createMockStoreWithIndexes(["pytorch", "react", "docs"]);
+
+    const runner = await MultiIndexRunner.create({
+      store,
+      // No indexNames = discovery mode
+    });
+
+    expect(runner.indexNames).toEqual(["pytorch", "react", "docs"]);
+
+    // Manually populate cache with mock clients (avoid initialization)
+    const mockClient = { initialized: true } as any;
+    (runner as any).clientCache.set("pytorch", mockClient);
+    (runner as any).clientCache.set("react", mockClient);
+    (runner as any).clientCache.set("docs", mockClient);
+
+    // Verify cache has all three entries
+    expect((runner as any).clientCache.size).toBe(3);
+
+    // Simulate store losing the "docs" index
+    (store.list as any).mockResolvedValue(["pytorch", "react"]);
+    (store.loadSearch as any).mockImplementation((name: string) => {
+      if (["pytorch", "react"].includes(name)) {
+        return Promise.resolve({
+          version: 1,
+          contextState: { version: 1 } as any,
+          source: {
+            type: "github",
+            config: { owner: "test", repo: name },
+            syncedAt: new Date().toISOString(),
+          },
+        });
+      }
+      return Promise.resolve(null);
+    });
+
+    await runner.refreshIndexList();
+
+    // Index list should be updated
+    expect(runner.indexNames).toEqual(["pytorch", "react"]);
+
+    // Cache should be pruned - only pytorch and react remain
+    expect((runner as any).clientCache.size).toBe(2);
+    expect((runner as any).clientCache.has("pytorch")).toBe(true);
+    expect((runner as any).clientCache.has("react")).toBe(true);
+    expect((runner as any).clientCache.has("docs")).toBe(false);
+  });
 });
