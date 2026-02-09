@@ -7,7 +7,7 @@
  * @module clients/multi-index-runner
  */
 
-import type { IndexStoreReader, IndexStore } from "../stores/types.js";
+import type { IndexStoreReader } from "../stores/types.js";
 import type { Source } from "../sources/types.js";
 import type { IndexStateSearchOnly } from "../core/types.js";
 import { getSourceIdentifier, getResolvedRef } from "../core/types.js";
@@ -26,7 +26,7 @@ export interface IndexInfo {
 /** Configuration for MultiIndexRunner */
 export interface MultiIndexRunnerConfig {
   /** Store to load indexes from */
-  store: IndexStoreReader | IndexStore;
+  store: IndexStoreReader;
   /**
    * Index names to expose. If undefined, all indexes in the store are exposed.
    */
@@ -95,7 +95,7 @@ export async function createSourceFromState(state: IndexStateSearchOnly): Promis
  * Lazily initializes SearchClient instances as needed and caches them.
  */
 export class MultiIndexRunner {
-  private readonly store: IndexStoreReader | IndexStore;
+  private readonly store: IndexStoreReader;
   private readonly searchOnly: boolean;
   private clientUserAgent?: string;
   private readonly clientCache = new Map<string, SearchClient>();
@@ -108,7 +108,7 @@ export class MultiIndexRunner {
   indexes: IndexInfo[];
 
   private constructor(
-    store: IndexStoreReader | IndexStore,
+    store: IndexStoreReader,
     indexNames: string[],
     indexes: IndexInfo[],
     searchOnly: boolean,

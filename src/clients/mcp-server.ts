@@ -37,7 +37,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { IndexStoreReader, IndexStore } from "../stores/types.js";
+import type { IndexStoreReader } from "../stores/types.js";
 import type { Source } from "../sources/types.js";
 import { MultiIndexRunner } from "./multi-index-runner.js";
 import { buildClientUserAgent, type MCPClientInfo } from "../core/utils.js";
@@ -53,7 +53,7 @@ import {
  */
 export interface MCPServerConfig {
   /** Store to load indexes from (accepts both reader-only and full store) */
-  store: IndexStoreReader | IndexStore;
+  store: IndexStoreReader;
   /**
    * Index names to expose. If undefined, all indexes in the store are exposed.
    */
