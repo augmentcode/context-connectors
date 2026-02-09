@@ -35,6 +35,11 @@ const stdioCommand = new Command("stdio")
         store = new ReadOnlyLayeredStore(localStore, remoteStore);
         indexNames = undefined; // Discovery mode: no fixed list
         discovery = true;
+      } else if (discoveryFlag) {
+        // Discovery mode with local indexes only
+        store = new FilesystemStore();
+        indexNames = undefined; // Discovery mode: no fixed list
+        discovery = true;
       } else if (indexSpecs && indexSpecs.length > 0) {
         // Fixed mode: use read-only CompositeStoreReader
         const specs = parseIndexSpecs(indexSpecs);
@@ -101,6 +106,11 @@ const httpCommand = new Command("http")
         const remoteStore = await CompositeStoreReader.fromSpecs(specs);
         const localStore = new FilesystemStore();
         store = new ReadOnlyLayeredStore(localStore, remoteStore);
+        indexNames = undefined; // Discovery mode: no fixed list
+        discovery = true;
+      } else if (discoveryFlag) {
+        // Discovery mode with local indexes only
+        store = new FilesystemStore();
         indexNames = undefined; // Discovery mode: no fixed list
         discovery = true;
       } else if (indexSpecs && indexSpecs.length > 0) {
