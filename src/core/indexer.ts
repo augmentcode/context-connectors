@@ -198,6 +198,7 @@ export class Indexer {
     const context = await DirectContext.create({
       apiKey: this.apiKey,
       apiUrl: this.apiUrl,
+      clientUserAgent: this.clientUserAgent,
     });
 
     // Fetch all files from source
@@ -261,6 +262,7 @@ export class Indexer {
     const context = await DirectContext.import(previousState.contextState, {
       apiKey: this.apiKey,
       apiUrl: this.apiUrl,
+      clientUserAgent: this.clientUserAgent,
     });
 
     // Remove deleted files
