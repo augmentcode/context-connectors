@@ -1,6 +1,6 @@
 {
   "name": "@augmentcode/context-connectors",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Modular system for indexing any data source and making it searchable via Augment's context engine",
   "type": "module",
   "files": [
