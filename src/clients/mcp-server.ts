@@ -71,6 +71,14 @@ export interface MCPServerConfig {
    * @default "0.1.0"
    */
   version?: string;
+  /**
+   * Optional shared MultiIndexRunner instance.
+   * When provided, this runner is used instead of creating a new one.
+   * This is useful for sharing a single runner across multiple MCP server instances
+   * (e.g., in HTTP server with multiple sessions) to avoid redundant store operations.
+   * @default undefined (creates a new runner)
+   */
+  runner?: MultiIndexRunner;
 }
 /**
  * Create an MCP server instance.
@@ -94,16 +102,23 @@ export interface MCPServerConfig {
 export async function createMCPServer(
   config: MCPServerConfig
 ): Promise<Server> {
-  // Create shared runner for multi-index operations
-  // Build User-Agent for analytics tracking
-  const clientUserAgent = buildClientUserAgent("mcp");
-  
-  const runner = await MultiIndexRunner.create({
-    store: config.store,
-    indexNames: config.indexNames,
-    searchOnly: config.searchOnly,
-    clientUserAgent,
-  });
+  // Use provided runner or create a new one
+  let runner: MultiIndexRunner;
+  if (config.runner) {
+    // Use the shared runner provided by the caller
+    runner = config.runner;
+  } else {
+    // Create a new runner for this server instance
+    // Build User-Agent for analytics tracking
+    const clientUserAgent = buildClientUserAgent("mcp");
+
+    runner = await MultiIndexRunner.create({
+      store: config.store,
+      indexNames: config.indexNames,
+      searchOnly: config.searchOnly,
+      clientUserAgent,
+    });
+  }
   const { indexNames, indexes } = runner;
   const searchOnly = !runner.hasFileOperations();
   // Format index list for tool descriptions
@@ -122,6 +137,9 @@ export async function createMCPServer(
   );
   // Use the SDK's oninitialized callback to capture MCP client info
   // This preserves the SDK's protocol version negotiation
+  // Note: When using a shared runner (e.g., in HTTP server), this will update
+  // the User-Agent for all sessions (last writer wins). This is acceptable
+  // because the User-Agent is primarily for analytics tracking.
   server.oninitialized = () => {
     const clientInfo = server.getClientVersion();
     if (clientInfo) {
