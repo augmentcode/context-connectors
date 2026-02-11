@@ -71,6 +71,14 @@ export interface MCPServerConfig {
    * @default "0.1.0"
    */
   version?: string;
+  /**
+   * Optional pre-initialized MultiIndexRunner to share across sessions.
+   * When provided, this runner is used instead of creating a new one.
+   * This is useful for HTTP servers to avoid redundant store.list() and
+   * store.loadSearch() calls for every session.
+   * @internal Used by mcp-http-server for session sharing optimization
+   */
+  runner?: MultiIndexRunner;
 }
 /**
  * Create an MCP server instance.
@@ -94,16 +102,23 @@ export interface MCPServerConfig {
 export async function createMCPServer(
   config: MCPServerConfig
 ): Promise<Server> {
-  // Create shared runner for multi-index operations
-  // Build User-Agent for analytics tracking
-  const clientUserAgent = buildClientUserAgent("mcp");
-  
-  const runner = await MultiIndexRunner.create({
-    store: config.store,
-    indexNames: config.indexNames,
-    searchOnly: config.searchOnly,
-    clientUserAgent,
-  });
+  // Use provided runner if available (for HTTP session sharing),
+  // otherwise create a new one (for stdio server)
+  let runner: MultiIndexRunner;
+  if (config.runner) {
+    runner = config.runner;
+  } else {
+    // Build User-Agent for analytics tracking
+    const clientUserAgent = buildClientUserAgent("mcp");
+
+    runner = await MultiIndexRunner.create({
+      store: config.store,
+      indexNames: config.indexNames,
+      searchOnly: config.searchOnly,
+      clientUserAgent,
+    });
+  }
+
   const { indexNames, indexes } = runner;
   const searchOnly = !runner.hasFileOperations();
   // Format index list for tool descriptions
@@ -122,6 +137,9 @@ export async function createMCPServer(
   );
   // Use the SDK's oninitialized callback to capture MCP client info
   // This preserves the SDK's protocol version negotiation
+  // Note: When using a shared runner (HTTP sessions), this updates the runner
+  // for all sessions (last writer wins). This is intentional - we want to track
+  // the most recent client info for analytics.
   server.oninitialized = () => {
     const clientInfo = server.getClientVersion();
     if (clientInfo) {
