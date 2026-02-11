@@ -28,6 +28,8 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { createMCPServer, MCPServerConfig } from "./mcp-server.js";
+import { MultiIndexRunner } from "./multi-index-runner.js";
+import { buildClientUserAgent } from "../core/utils.js";
 
 /**
  * HTTP error with status code for proper client error responses.
@@ -165,9 +167,26 @@ export async function createMCPHttpServer(
   // Store transports by session ID
   const transports: Map<string, StreamableHTTPServerTransport> = new Map();
 
+  // Create a shared MultiIndexRunner for all HTTP sessions to avoid redundant
+  // store.list() and store.loadSearch() calls on every session initialization.
+  // This is safe because MultiIndexRunner already has lazy client caching.
+  // Each session still gets its own MCP Server instance (required by MCP protocol),
+  // but they all share the same underlying runner and search clients.
+  const clientUserAgent = buildClientUserAgent("mcp");
+  const sharedRunner = await MultiIndexRunner.create({
+    store: config.store,
+    indexNames: config.indexNames,
+    searchOnly: config.searchOnly,
+    clientUserAgent,
+  });
+
   // Create the underlying MCP server factory (creates new instance per session)
+  // Each session gets its own Server instance but shares the MultiIndexRunner
   const createServerInstance = async (): Promise<Server> => {
-    return createMCPServer(config);
+    return createMCPServer({
+      ...config,
+      runner: sharedRunner,
+    });
   };
 
   /**
