@@ -7,6 +7,7 @@ import { FilesystemStore } from "../stores/filesystem.js";
 import { runMCPServer } from "../clients/mcp-server.js";
 import { parseIndexSpecs } from "../stores/index-spec.js";
 import { CompositeStoreReader } from "../stores/composite.js";
+import { ReadOnlyLayeredStore } from "../stores/read-only-layered-store.js";
 
 // stdio subcommand (stdio-based MCP server for local clients like Claude Desktop)
 const stdioCommand = new Command("stdio")
@@ -15,29 +16,48 @@ const stdioCommand = new Command("stdio")
     "-i, --index <specs...>",
     "Index spec(s): name, path:/path, or s3://bucket/key"
   )
+  .option("--discovery", "Enable discovery mode (read-only, manage indexes via CLI)")
   .option("--search-only", "Disable list_files/read_file tools (search only)")
   .action(async (options) => {
     try {
       const indexSpecs: string[] | undefined = options.index;
+      const discoveryFlag = options.discovery;
 
       let store;
-      let indexNames: string[];
+      let indexNames: string[] | undefined;
+      let discovery: boolean;
 
-      if (indexSpecs && indexSpecs.length > 0) {
-        // Parse index specs and create composite store
+      if (discoveryFlag && indexSpecs && indexSpecs.length > 0) {
+        // Discovery mode WITH remote indexes: merge local + remote
         const specs = parseIndexSpecs(indexSpecs);
-        store = await CompositeStoreReader.fromSpecs(specs);
-        indexNames = specs.map((s) => s.displayName);
-      } else {
-        // No --index: use default store, list all indexes
+        const remoteStore = await CompositeStoreReader.fromSpecs(specs);
+        const localStore = new FilesystemStore();
+        store = new ReadOnlyLayeredStore(localStore, remoteStore);
+        indexNames = undefined; // Discovery mode: no fixed list
+        discovery = true;
+      } else if (discoveryFlag) {
+        // Discovery mode with local indexes only
         store = new FilesystemStore();
-        indexNames = await store.list();
-        if (indexNames.length === 0) {
+        indexNames = undefined; // Discovery mode: no fixed list
+        discovery = true;
+      } else if (indexSpecs && indexSpecs.length > 0) {
+        // Fixed mode: use read-only CompositeStoreReader
+        const specs = parseIndexSpecs(indexSpecs);
+        indexNames = specs.map((s) => s.displayName);
+        store = await CompositeStoreReader.fromSpecs(specs);
+        discovery = false;
+      } else {
+        // No flags: restore original behavior - fail fast if no indexes
+        store = new FilesystemStore();
+        const availableIndexes = await store.list();
+        if (availableIndexes.length === 0) {
           console.error("Error: No indexes found.");
           console.error("The MCP server requires at least one index to operate.");
           console.error("Run 'ctxc index --help' to see how to create an index.");
           process.exit(1);
         }
+        indexNames = availableIndexes;
+        discovery = false;
       }
 
       // Start MCP server (writes to stdout, reads from stdin)
@@ -45,6 +65,7 @@ const stdioCommand = new Command("stdio")
         store,
         indexNames,
         searchOnly: options.searchOnly,
+        discovery,
       });
     } catch (error) {
       // Write errors to stderr (stdout is for MCP protocol)
@@ -60,6 +81,7 @@ const httpCommand = new Command("http")
     "-i, --index <specs...>",
     "Index spec(s): name, path:/path, or s3://bucket/key"
   )
+  .option("--discovery", "Enable discovery mode (read-only, manage indexes via CLI)")
   .option("--port <number>", "Port to listen on", "3000")
   .option("--host <host>", "Host to bind to", "localhost")
   .option("--cors <origins>", "CORS origins (comma-separated, or '*' for any)")
@@ -72,17 +94,33 @@ const httpCommand = new Command("http")
   .action(async (options) => {
     try {
       const indexSpecs: string[] | undefined = options.index;
+      const discoveryFlag = options.discovery;
 
       let store;
       let indexNames: string[] | undefined;
+      let discovery: boolean;
 
-      if (indexSpecs && indexSpecs.length > 0) {
-        // Parse index specs and create composite store
+      if (discoveryFlag && indexSpecs && indexSpecs.length > 0) {
+        // Discovery mode WITH remote indexes: merge local + remote
         const specs = parseIndexSpecs(indexSpecs);
-        store = await CompositeStoreReader.fromSpecs(specs);
+        const remoteStore = await CompositeStoreReader.fromSpecs(specs);
+        const localStore = new FilesystemStore();
+        store = new ReadOnlyLayeredStore(localStore, remoteStore);
+        indexNames = undefined; // Discovery mode: no fixed list
+        discovery = true;
+      } else if (discoveryFlag) {
+        // Discovery mode with local indexes only
+        store = new FilesystemStore();
+        indexNames = undefined; // Discovery mode: no fixed list
+        discovery = true;
+      } else if (indexSpecs && indexSpecs.length > 0) {
+        // Fixed mode: use read-only CompositeStoreReader
+        const specs = parseIndexSpecs(indexSpecs);
         indexNames = specs.map((s) => s.displayName);
+        store = await CompositeStoreReader.fromSpecs(specs);
+        discovery = false;
       } else {
-        // No --index: use default store, serve all
+        // No flags: restore original behavior - fail fast if no indexes
         store = new FilesystemStore();
         const availableIndexes = await store.list();
         if (availableIndexes.length === 0) {
@@ -91,7 +129,8 @@ const httpCommand = new Command("http")
           console.error("Run 'ctxc index --help' to see how to create an index.");
           process.exit(1);
         }
-        indexNames = undefined;
+        indexNames = availableIndexes;
+        discovery = false;
       }
 
       // Parse CORS option
@@ -112,6 +151,7 @@ const httpCommand = new Command("http")
         store,
         indexNames,
         searchOnly: options.searchOnly,
+        discovery,
         port: parseInt(options.port, 10),
         host: options.host,
         cors,

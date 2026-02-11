@@ -41,6 +41,13 @@ export interface MultiIndexRunnerConfig {
    * When provided, this is passed to SearchClient instances for API requests.
    */
   clientUserAgent?: string;
+  /**
+   * Discovery mode flag.
+   * When true: allow empty index list (user can add indexes later via CLI)
+   * When false: require at least one valid index to be loaded
+   * @default false
+   */
+  discovery?: boolean;
 }
 
 /**
@@ -92,25 +99,28 @@ export class MultiIndexRunner {
   private readonly searchOnly: boolean;
   private clientUserAgent?: string;
   private readonly clientCache = new Map<string, SearchClient>();
+  private readonly originalIndexNames: string[] | undefined;
 
   /** Available index names */
-  readonly indexNames: string[];
+  indexNames: string[];
 
   /** Metadata about available indexes */
-  readonly indexes: IndexInfo[];
+  indexes: IndexInfo[];
 
   private constructor(
     store: IndexStoreReader,
     indexNames: string[],
     indexes: IndexInfo[],
     searchOnly: boolean,
-    clientUserAgent?: string
+    clientUserAgent?: string,
+    originalIndexNames?: string[]
   ) {
     this.store = store;
     this.indexNames = indexNames;
     this.indexes = indexes;
     this.searchOnly = searchOnly;
     this.clientUserAgent = clientUserAgent;
+    this.originalIndexNames = originalIndexNames;
   }
 
   /**
@@ -119,19 +129,19 @@ export class MultiIndexRunner {
   static async create(config: MultiIndexRunnerConfig): Promise<MultiIndexRunner> {
     const store = config.store;
     const searchOnly = config.searchOnly ?? false;
+    const discovery = config.discovery ?? false;
 
     // Discover available indexes
     const allIndexNames = await store.list();
     const indexNames = config.indexNames ?? allIndexNames;
 
+    // In fixed mode, save the original allowlist for later filtering
+    const originalIndexNames = config.indexNames ? [...config.indexNames] : undefined;
+
     // Validate requested indexes exist
     const missingIndexes = indexNames.filter((n) => !allIndexNames.includes(n));
     if (missingIndexes.length > 0) {
       throw new Error(`Indexes not found: ${missingIndexes.join(", ")}`);
-    }
-
-    if (indexNames.length === 0) {
-      throw new Error("No indexes available in store");
     }
 
     // Load metadata for available indexes, filtering out any that fail to load
@@ -156,17 +166,17 @@ export class MultiIndexRunner {
       }
     }
 
-    if (validIndexNames.length === 0) {
-      throw new Error("No valid indexes available (all indexes failed to load)");
+    // In fixed mode (non-discovery), require at least one valid index
+    if (!discovery && validIndexNames.length === 0) {
+      throw new Error("No valid indexes loaded. Fixed mode requires at least one index.");
     }
 
-    return new MultiIndexRunner(store, validIndexNames, indexes, searchOnly, config.clientUserAgent);
+    return new MultiIndexRunner(store, validIndexNames, indexes, searchOnly, config.clientUserAgent, originalIndexNames);
   }
-
 
   /**
    * Update the User-Agent string.
-   * 
+   *
    * Call this after receiving MCP client info to include the client name/version.
    * Note: Only affects future client creations, not existing cached clients.
    */
@@ -203,6 +213,64 @@ export class MultiIndexRunner {
       this.clientCache.set(indexName, client);
     }
     return client;
+  }
+
+  /**
+   * Refresh the list of available indexes from the store.
+   * Call after adding or removing indexes.
+   *
+   * In fixed mode (when originalIndexNames is set), this is a no-op.
+   * The list is completely static and never changes.
+   *
+   * In discovery mode, refreshes from the store to pick up new/deleted indexes.
+   */
+  async refreshIndexList(): Promise<void> {
+    // In fixed mode, the list is static - don't refresh
+    if (this.originalIndexNames) {
+      return;
+    }
+
+    // Discovery mode: refresh from store
+    const allIndexNames = await this.store.list();
+
+    const newIndexes: IndexInfo[] = [];
+    const newIndexNames: string[] = [];
+
+    for (const name of allIndexNames) {
+      try {
+        const state = await this.store.loadSearch(name);
+        if (state) {
+          newIndexNames.push(name);
+          newIndexes.push({
+            name,
+            type: state.source.type,
+            identifier: getSourceIdentifier(state.source),
+            ref: getResolvedRef(state.source),
+            syncedAt: state.source.syncedAt,
+          });
+        }
+      } catch {
+        // Skip indexes that fail to load
+      }
+    }
+
+    this.indexNames = newIndexNames;
+    this.indexes = newIndexes;
+
+    // Prune stale cache entries for removed indexes
+    for (const cachedName of this.clientCache.keys()) {
+      if (!newIndexNames.includes(cachedName)) {
+        this.clientCache.delete(cachedName);
+      }
+    }
+  }
+
+  /**
+   * Invalidate cached SearchClient for an index.
+   * Call after updating an index to ensure fresh data on next access.
+   */
+  invalidateClient(indexName: string): void {
+    this.clientCache.delete(indexName);
   }
 
   /** Check if file operations are enabled */

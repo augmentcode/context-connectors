@@ -38,19 +38,21 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { IndexStoreReader } from "../stores/types.js";
+import type { Source } from "../sources/types.js";
 import { MultiIndexRunner } from "./multi-index-runner.js";
 import { buildClientUserAgent, type MCPClientInfo } from "../core/utils.js";
 import {
   SEARCH_DESCRIPTION,
   LIST_FILES_DESCRIPTION,
   READ_FILE_DESCRIPTION,
+  withListIndexesReference,
   withIndexList,
 } from "./tool-descriptions.js";
 /**
  * Configuration for the MCP server.
  */
 export interface MCPServerConfig {
-  /** Store to load indexes from */
+  /** Store to load indexes from (accepts both reader-only and full store) */
   store: IndexStoreReader;
   /**
    * Index names to expose. If undefined, all indexes in the store are exposed.
@@ -71,6 +73,13 @@ export interface MCPServerConfig {
    * @default "0.1.0"
    */
   version?: string;
+  /**
+   * Discovery mode flag.
+   * When true: use withListIndexesReference (no enum in schemas), dynamic index list
+   * When false/undefined: use withIndexList (include enum in schemas), static index list
+   * @default false
+   */
+  discovery?: boolean;
 }
 /**
  * Create an MCP server instance.
@@ -97,13 +106,15 @@ export async function createMCPServer(
   // Create shared runner for multi-index operations
   // Build User-Agent for analytics tracking
   const clientUserAgent = buildClientUserAgent("mcp");
-  
+
   const runner = await MultiIndexRunner.create({
     store: config.store,
     indexNames: config.indexNames,
     searchOnly: config.searchOnly,
     clientUserAgent,
+    discovery: config.discovery,
   });
+
   const { indexNames, indexes } = runner;
   const searchOnly = !runner.hasFileOperations();
   // Format index list for tool descriptions
@@ -146,13 +157,35 @@ export async function createMCPServer(
       required?: string[];
     };
   };
-  // Tool descriptions with available indexes (from shared module)
-  const searchDescription = withIndexList(SEARCH_DESCRIPTION, indexListStr);
-  const listFilesDescription = withIndexList(LIST_FILES_DESCRIPTION, indexListStr);
-  const readFileDescription = withIndexList(READ_FILE_DESCRIPTION, indexListStr);
+
+  // Tool descriptions: use enum in fixed mode, reference in discovery mode
+  let searchDescription: string;
+  let listFilesDescription: string;
+  let readFileDescription: string;
+
+  if (config.discovery) {
+    // Discovery mode: use reference to list_indexes (no enum)
+    searchDescription = withListIndexesReference(SEARCH_DESCRIPTION);
+    listFilesDescription = withListIndexesReference(LIST_FILES_DESCRIPTION);
+    readFileDescription = withListIndexesReference(READ_FILE_DESCRIPTION);
+  } else {
+    // Fixed mode: include enum with index list
+    searchDescription = withIndexList(SEARCH_DESCRIPTION, indexListStr);
+    listFilesDescription = withIndexList(LIST_FILES_DESCRIPTION, indexListStr);
+    readFileDescription = withIndexList(READ_FILE_DESCRIPTION, indexListStr);
+  }
   // List available tools
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     const tools: Tool[] = [
+      {
+        name: "list_indexes",
+        description: "List all available indexes with their metadata. Call this to discover what indexes are available before using search, list_files, or read_file tools.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+          required: [],
+        },
+      },
       {
         name: "search",
         description: searchDescription,
@@ -162,7 +195,7 @@ export async function createMCPServer(
             index_name: {
               type: "string",
               description: "Name of the index to search.",
-              enum: indexNames,
+              ...(config.discovery ? {} : { enum: runner.indexes.map(i => i.name) }),
             },
             query: {
               type: "string",
@@ -189,7 +222,7 @@ export async function createMCPServer(
               index_name: {
                 type: "string",
                 description: "Name of the index.",
-                enum: indexNames,
+                ...(config.discovery ? {} : { enum: runner.indexes.map(i => i.name) }),
               },
               directory: {
                 type: "string",
@@ -220,7 +253,7 @@ export async function createMCPServer(
               index_name: {
                 type: "string",
                 description: "Name of the index.",
-                enum: indexNames,
+                ...(config.discovery ? {} : { enum: runner.indexes.map(i => i.name) }),
               },
               path: {
                 type: "string",
@@ -261,6 +294,31 @@ export async function createMCPServer(
   // Handle tool calls
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
+
+    // Handle list_indexes separately (no index_name required)
+    if (name === "list_indexes") {
+      try {
+        await runner.refreshIndexList();
+        const { indexes } = runner;
+        if (indexes.length === 0) {
+          return {
+            content: [{ type: "text", text: "No indexes available. Use `ctxc index` CLI to create one." }],
+          };
+        }
+        const lines = indexes.map((i) =>
+          `- ${i.name} (${i.type}://${i.identifier}) - synced ${i.syncedAt}`
+        );
+        return {
+          content: [{ type: "text", text: `Available indexes:\n${lines.join("\n")}` }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Error listing indexes: ${error}` }],
+          isError: true,
+        };
+      }
+    }
+
     try {
       const indexName = args?.index_name as string;
       const client = await runner.getClient(indexName);

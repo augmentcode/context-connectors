@@ -65,11 +65,22 @@ NOT supported: \\d, \\s, \\w (use [0-9], [ \\t], [a-zA-Z_] instead)`;
 
 /**
  * Format a tool description with available indexes for multi-index mode.
+ * Used by CLI agent which cannot call list_indexes dynamically.
  */
 export function withIndexList(baseDescription: string, indexListStr: string): string {
   return `${baseDescription}
 
 Available indexes:
 ${indexListStr}`;
+}
+
+/**
+ * Format a tool description with a reference to list_indexes.
+ * Used by MCP server where agents can call list_indexes dynamically.
+ */
+export function withListIndexesReference(baseDescription: string): string {
+  return `${baseDescription}
+
+Use list_indexes to see available indexes.`;
 }
 
